@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 using HtmlAgilityPack;
@@ -9,7 +10,15 @@ public class SvitekScraper
 {
     private const string BaseUrl = "https://www.woodcraft.cz/files/web/svitek/index.php";
 
+    private static readonly Encoding Windows1250;
+
     private readonly HttpClient _httpClient;
+
+    static SvitekScraper()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        Windows1250 = Encoding.GetEncoding("windows-1250");
+    }
 
     public SvitekScraper(HttpClient httpClient)
     {
@@ -32,8 +41,8 @@ public class SvitekScraper
 
         foreach (var link in links)
         {
-            var text = link.InnerText.Trim();
-            var href = link.GetAttributeValue("href", "");
+            var text = WebUtility.HtmlDecode(link.InnerText).Trim();
+            var href = WebUtility.HtmlDecode(link.GetAttributeValue("href", ""));
             var query = HttpUtility.ParseQueryString(new Uri(BaseUrl + "?" + href.Split('?').LastOrDefault()).Query);
             var sectionCode = query["section"] ?? "";
 
@@ -237,11 +246,11 @@ public class SvitekScraper
 
     public string StripHtml(string html)
     {
-        // Remove ČIN/VELKÝ ČIN labels
+        // Remove ČIN/VELKÝ ČIN challenge type labels
         html = Regex.Replace(html, @"<span>\s*(?:VELK[ÝY]\s+)?[ČC]IN\s*</span>", "", RegexOptions.None);
         html = Regex.Replace(html, @"(?:VELK[ÝY]\s+)?[ČC]IN\s*$", "", RegexOptions.Multiline);
 
-        // Extract tables
+        // Extract and preserve tables
         var tables = new List<string>();
         html = Regex.Replace(html, @"<table.*?</table>", m =>
         {
@@ -250,16 +259,16 @@ public class SvitekScraper
             return placeholder;
         }, RegexOptions.Singleline);
 
-        // Strip HTML tags
+        // Strip remaining HTML tags
         var text = Regex.Replace(html, @"<[^>]+>", "");
         text = WebUtility.HtmlDecode(text);
 
-        // Normalize whitespace
+        // Normalize whitespace (including non-breaking spaces)
         text = text.Replace("\u00A0", " ");
         text = Regex.Replace(text, @"\s+", " ");
         text = text.Trim();
 
-        // Restore tables
+        // Restore preserved tables
         for (var i = 0; i < tables.Count; i++)
         {
             text = text.Replace($"{{{{TABLE_{i}}}}}", tables[i]);
@@ -304,12 +313,14 @@ public class SvitekScraper
         var queryString = string.Join("&", parameters.Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value)}"));
         var url = $"{BaseUrl}?{queryString}";
 
-        var response = await _httpClient.GetStringAsync(url);
-        return response;
+        var responseBytes = await _httpClient.GetByteArrayAsync(url);
+        return Windows1250.GetString(responseBytes);
     }
 
     private HtmlDocument ParseHtml(string html)
     {
+        // Replace windows-1250 meta charset with utf-8 so HtmlAgilityPack parses correctly
+        html = Regex.Replace(html, @"charset=windows-1250", "charset=utf-8", RegexOptions.IgnoreCase);
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
         return doc;

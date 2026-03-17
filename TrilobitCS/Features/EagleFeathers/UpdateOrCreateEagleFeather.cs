@@ -38,6 +38,10 @@ public class UpdateOrCreateEagleFeatherHandler : IRequestHandler<UpdateOrCreateE
                 Light = request.Light,
                 Section = request.Section,
                 Number = request.Number,
+                Name = request.Name,
+                Challenge = request.Challenge,
+                GrandChallenge = request.GrandChallenge,
+                SourceUrl = request.SourceUrl,
                 CreatedAt = DateTime.UtcNow
             };
             _db.EagleFeathers.Add(feather);

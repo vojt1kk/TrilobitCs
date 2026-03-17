@@ -13,7 +13,7 @@ public class AppDbContext : DbContext
     {
         modelBuilder.Entity<EagleFeather>(entity =>
         {
-            // Unique index na Light + Section + Number (= composite unique key pro updateOrCreate)
+            // Laravel: unique composite key for updateOrCreate
             entity.HasIndex(e => new { e.Light, e.Section, e.Number }).IsUnique();
         });
     }
