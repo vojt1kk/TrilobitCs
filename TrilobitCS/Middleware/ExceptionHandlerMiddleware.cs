@@ -24,5 +24,12 @@ public class ExceptionHandlerMiddleware
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
         }
+        // Laravel: AuthenticationException → abort(401)
+        catch (UnauthorizedException ex)
+        {
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
+        }
     }
 }

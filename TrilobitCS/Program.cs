@@ -1,7 +1,14 @@
+using System.Text;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using TrilobitCS.Auth;
 using TrilobitCS.Console;
 using TrilobitCS.Data;
 using TrilobitCS.Middleware;
+using TrilobitCS.Repositories;
 using TrilobitCS.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,11 +19,43 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+// Laravel: Hash::make() a Hash::check()
+builder.Services.AddScoped<BcryptPasswordHasher>();
+
+// Laravel: App\Repositories\UserRepository
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+
+// Laravel: php artisan make:auth → JWT service pro generování tokenů
+builder.Services.AddScoped<JwtTokenService>();
+
+// Laravel: config/auth.php — 'driver' => 'jwt'
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT Key not configured.");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
 // Laravel: AppServiceProvider::register()
 builder.Services.AddHttpClient<SvitekScraper>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
 builder.Services.AddControllers();
+
+// Laravel: FormRequest::rules()
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 var app = builder.Build();
 
@@ -24,11 +63,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
 }
 
 // Laravel: php artisan app:scrape-eagle-feathers
-// Usage: dotnet run -- scrape
 if (args.Contains("scrape"))
 {
     using var scope = app.Services.CreateScope();
@@ -40,7 +78,11 @@ if (args.Contains("scrape"))
 // Laravel: app/Exceptions/Handler.php
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 
-// Laravel: routes/api.php — controllers are auto-discovered via [Route] attributes
+// Laravel: \Illuminate\Auth\Middleware\Authenticate
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Laravel: routes/api.php
 app.MapControllers();
 
 app.Run();
