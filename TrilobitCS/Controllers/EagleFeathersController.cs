@@ -17,14 +17,23 @@ public class EagleFeathersController : ControllerBase
         _db = db;
     }
 
+    /// <summary>Get all eagle feathers</summary>
+    /// <response code="200">Returns an array of eagle feathers</response>
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<EagleFeatherResponse>), 200)]
     public async Task<IActionResult> Index()
     {
         var feathers = await _db.EagleFeathers.ToListAsync();
         return Ok(feathers.Select(EagleFeatherResponse.FromModel));
     }
 
+    /// <summary>Get a single eagle feather by ID</summary>
+    /// <param name="id">Eagle feather ID</param>
+    /// <response code="200">Returns the eagle feather</response>
+    /// <response code="404">Eagle feather not found</response>
     [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(EagleFeatherResponse), 200)]
+    [ProducesResponseType(404)]
     public async Task<IActionResult> Show(int id)
     {
         var feather = await _db.EagleFeathers.FindAsync(id)
