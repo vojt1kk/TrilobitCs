@@ -54,6 +54,37 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Pr
 builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
 builder.Services.AddControllers();
 
+// Laravel ekvivalent: L5-Swagger / Scribe — generování API dokumentace
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new() { Title = "TrilobitCS API", Version = "v1" });
+
+    // Přidá tlačítko "Authorize" pro JWT Bearer token
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+    });
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 // Laravel: FormRequest::rules()
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -82,6 +113,9 @@ if (args.Contains("scrape"))
     await command.ExecuteAsync(System.Console.WriteLine);
     return;
 }
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 // Laravel: app/Exceptions/Handler.php
 app.UseMiddleware<ExceptionHandlerMiddleware>();
