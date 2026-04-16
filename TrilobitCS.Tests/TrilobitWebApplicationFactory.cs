@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
+using TrilobitCS.Data;
 using Xunit;
 
 namespace TrilobitCS.Tests;
@@ -25,16 +28,26 @@ public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAs
     {
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            // Přepíše connection string + JWT config pro testovací PostgreSQL kontejner
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
                 ["Jwt:Key"] = "super-secret-test-key-that-is-at-least-32-chars!!",
                 ["Jwt:Issuer"] = "trilobit-test",
                 ["Jwt:Audience"] = "trilobit-test",
                 ["Jwt:AccessTokenExpiresInMinutes"] = "15",
                 ["Jwt:RefreshTokenExpiresInDays"] = "180",
             });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Odstraní DbContext registrovaný v Program.cs (s dev connection stringem)
+            // a nahradí ho testovacím PostgreSQL kontejnerem (Testcontainers)
+            // Laravel ekvivalent: výměna DB spojení přes RefreshDatabase trait
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+            if (descriptor != null) services.Remove(descriptor);
+
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseNpgsql(_postgres.GetConnectionString()));
         });
     }
 }
