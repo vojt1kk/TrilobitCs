@@ -35,10 +35,10 @@ public class RegisterHandler : IRequestHandler<RegisterCommand, AuthResponse>
         var request = command.Request;
 
         if (await _userRepository.EmailExists(request.Email, cancellationToken))
-            throw new UnauthorizedException("errors.email_taken");
+            throw new ConflictException("errors.email_taken");
 
         if (await _userRepository.NicknameExists(request.Nickname, cancellationToken))
-            throw new UnauthorizedException("errors.nickname_taken");
+            throw new ConflictException("errors.nickname_taken");
 
         var user = await _userRepository.Create(
             CreateUserDto.FromRequest(request, _hasher.Hash(request.Password)),

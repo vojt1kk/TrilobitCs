@@ -14,11 +14,11 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 
         RuleFor(x => x.FirstName)
             .NotEmpty()
-            .MaximumLength(100);
+            .MaximumLength(20);
 
         RuleFor(x => x.LastName)
             .NotEmpty()
-            .MaximumLength(100);
+            .MaximumLength(20);
 
         RuleFor(x => x.Email)
             .NotEmpty()
@@ -27,6 +27,11 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
         RuleFor(x => x.Password)
             .NotEmpty()
             .MinimumLength(10);
+
+        // Laravel: 'password' => ['confirmed']
+        RuleFor(x => x.PasswordConfirm)
+            .Equal(x => x.Password)
+            .WithMessage("'Password Confirm' must match 'Password'.");
 
         RuleFor(x => x.BirthDate)
             .NotEmpty()

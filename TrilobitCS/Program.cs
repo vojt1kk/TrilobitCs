@@ -2,6 +2,7 @@ using System.Text;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TrilobitCS.Auth;
@@ -57,6 +58,13 @@ builder.Services.AddControllers();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
+// Validation errors → 422 místo výchozích 400
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+        new UnprocessableEntityObjectResult(context.ModelState);
+});
+
 var app = builder.Build();
 
 // Laravel: php artisan migrate
@@ -86,3 +94,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Zpřístupní třídu Program testovacímu projektu (WebApplicationFactory<Program>)
+public partial class Program { }

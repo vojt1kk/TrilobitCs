@@ -9,6 +9,7 @@ public record RegisterRequest(
     string LastName,
     string Email,
     string Password,
+    string PasswordConfirm,
     Gender Gender,
     DateOnly BirthDate
 );

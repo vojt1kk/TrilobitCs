@@ -19,6 +19,9 @@ public class LogoutHandler : IRequestHandler<LogoutCommand>
 
     public async Task Handle(LogoutCommand command, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(command.Request.RefreshToken))
+            throw new UnauthorizedException();
+
         var token = await _refreshTokenRepository.FindWithUser(command.Request.RefreshToken, cancellationToken)
             ?? throw new NotFoundException("errors.invalid_refresh_token");
 

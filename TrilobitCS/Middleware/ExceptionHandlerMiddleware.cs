@@ -18,16 +18,22 @@ public class ExceptionHandlerMiddleware
         {
             await _next(context);
         }
+        // Laravel: AuthenticationException → abort(401)
+        catch (UnauthorizedException ex)
+        {
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
+        }
         catch (NotFoundException ex)
         {
             context.Response.StatusCode = 404;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
         }
-        // Laravel: AuthenticationException → abort(401)
-        catch (UnauthorizedException ex)
+        catch (ConflictException ex)
         {
-            context.Response.StatusCode = 401;
+            context.Response.StatusCode = 422;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
         }
