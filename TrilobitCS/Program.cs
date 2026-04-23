@@ -64,11 +64,14 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Pr
 builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
 builder.Services.AddControllers();
 
-// Response compression: odpověď dorazí na reverse proxy (Cloudflare před Renderem)
-// už komprimovaná (gzip), takže CF ji nepřekompresuje rozbitým brotli — viz Swagger UI issue.
+// Response compression: app zkomprimuje odpověď sám (gzip/brotli). Tím zabráníme,
+// aby to za nás dělal Cloudflare před Renderem — jejich brotli vrací 0 bytes a lámal
+// Swagger UI ("does not specify a valid version field").
 builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
 });
 
 // Laravel ekvivalent: L5-Swagger / Scribe — generování API dokumentace
