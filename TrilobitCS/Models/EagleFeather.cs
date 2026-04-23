@@ -12,4 +12,7 @@ public class EagleFeather
     public required string SourceUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    public ICollection<UserEagleFeather> UserEagleFeathers { get; set; } = new List<UserEagleFeather>();
+    public ICollection<Challenge> Challenges { get; set; } = new List<Challenge>();
 }
