@@ -1,7 +1,8 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Auth;
+using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
-using TrilobitCS.Repositories;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
 
@@ -12,19 +13,13 @@ public record LoginCommand(LoginRequest Request) : IRequest<AuthResponse>;
 // Laravel: AuthController@login
 public class LoginHandler : IRequestHandler<LoginCommand, AuthResponse>
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly AppDbContext _db;
     private readonly BcryptPasswordHasher _hasher;
     private readonly JwtTokenService _jwtTokenService;
 
-    public LoginHandler(
-        IUserRepository userRepository,
-        IRefreshTokenRepository refreshTokenRepository,
-        BcryptPasswordHasher hasher,
-        JwtTokenService jwtTokenService)
+    public LoginHandler(AppDbContext db, BcryptPasswordHasher hasher, JwtTokenService jwtTokenService)
     {
-        _userRepository = userRepository;
-        _refreshTokenRepository = refreshTokenRepository;
+        _db = db;
         _hasher = hasher;
         _jwtTokenService = jwtTokenService;
     }
@@ -33,13 +28,14 @@ public class LoginHandler : IRequestHandler<LoginCommand, AuthResponse>
     {
         var request = command.Request;
 
-        var user = await _userRepository.FindByNickname(request.Nickname, cancellationToken);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Nickname == request.Nickname, cancellationToken);
 
         if (user == null || !_hasher.Verify(request.Password, user.Password))
             throw new UnauthorizedException("errors.invalid_credentials");
 
-        var refreshToken = await _refreshTokenRepository.Create(
-            _jwtTokenService.GenerateRefreshToken(user), cancellationToken);
+        var refreshToken = _jwtTokenService.GenerateRefreshToken(user);
+        _db.RefreshTokens.Add(refreshToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return new AuthResponse(
             AccessToken: _jwtTokenService.GenerateAccessToken(user),

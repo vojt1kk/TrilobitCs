@@ -131,30 +131,33 @@ TrilobitCS/
 ├── Controllers/
 │   ├── AuthController.cs           # POST /api/auth/{register,login,refresh,logout}
 │   └── EagleFeathersController.cs  # GET /api/eagle-feathers, GET /api/eagle-feathers/{id}
+├── Controllers/
+│   ├── AuthController.cs           # POST /api/auth/{register,login,refresh,logout}
+│   ├── EagleFeathersController.cs  # GET /api/eagle-feathers
+│   └── UsersController.cs          # GET /api/users/{id}, PUT/DELETE /api/user
 ├── Data/
-│   └── AppDbContext.cs             # EF Core DbContext
-├── Dto/                            # Interní přenosové objekty (ne request/response)
+│   └── AppDbContext.cs             # EF Core DbContext — používá se přímo v handlerech
 ├── Exceptions/                     # NotFoundException, ConflictException, UnauthorizedException
 ├── Features/                       # CQRS handlery (MediatR)
 │   ├── Auth/                       # RegisterCommand, LoginCommand, LogoutCommand, RefreshCommand
-│   └── EagleFeathers/              # UpdateOrCreateEagleFeatherCommand
+│   ├── EagleFeathers/              # UpdateOrCreateEagleFeatherCommand
+│   └── Users/                      # GetUserQuery, UpdateUserCommand, DeleteUserCommand
 ├── Middleware/
 │   └── ExceptionHandlerMiddleware.cs
 ├── Migrations/
 ├── Models/                         # EF Core entity (User, EagleFeather, RefreshToken, Gender)
-├── Repositories/                   # IUserRepository, IRefreshTokenRepository + implementace
-├── Requests/                       # RegisterRequest, LoginRequest, RefreshRequest
-├── Responses/                      # AuthResponse, EagleFeatherResponse
+├── Requests/                       # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest
+├── Responses/                      # AuthResponse, EagleFeatherResponse, UserResponse
 ├── Services/
 │   └── SvitekScraper.cs            # Scraper woodcraft.cz (Windows-1250 encoding)
-└── Validators/                     # RegisterRequestValidator, LoginRequestValidator
+└── Validators/                     # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator
 
 TrilobitCS.Tests/
 ├── ApiCollection.cs                # Sdílí 1 PostgreSQL kontejner napříč testy [Collection("Api")]
 ├── TrilobitWebApplicationFactory.cs
 ├── Auth/                           # RegisterApiTests, LoginApiTests, LogoutApiTests, RefreshApiTests
-└── Factories/
-    └── RegisterRequestFactory.cs   # Bogus factory — Make() vrací platný RegisterRequest
+├── Users/                          # GetUserApiTests, UpdateUserApiTests, DeleteUserApiTests
+└── Factories/                      # RegisterRequestFactory, UpdateUserRequestFactory (Bogus)
 ```
 
 ---
@@ -198,13 +201,29 @@ Výjimky se zahazují v `Features/` handlerech, middleware je mapuje na HTTP odp
 
 Response body: `{ "message": "..." }` — zpráva je i18n klíč (např. `"errors.email_taken"`).
 
-### Repository pattern
+### Data access — přímo přes `AppDbContext`
 
-Databázový přístup jde přes interfaces (`IUserRepository`, `IRefreshTokenRepository`). Přidávej interface i implementaci pro každý nový repozitář. EF Core DbContext (`AppDbContext`) se používá přímo jen v `EagleFeathersController` (read-only, zatím bez command handleru).
+**Žádná repository vrstva.** `DbSet<T>` už je repository + unit of work, wrapovat ho dalším interface nepřináší hodnotu (EF Core tým to nedoporučuje). Handlery v `Features/` injektují `AppDbContext` přímo:
+
+- **Queries** projektují rovnou na response DTO přes `.Select()` — nenačítá se celá entita, do DB jde jen to, co je v response (žádné `password` hashe na drátě):
+  ```csharp
+  await _db.Users.Where(u => u.Id == id)
+      .Select(u => new UserResponse(u.Id, u.Nickname, ..., u.CreatedAt))
+      .FirstOrDefaultAsync(ct)
+      ?? throw new NotFoundException("errors.user_not_found");
+  ```
+- **Commands** načtou entitu, zmutují ji, a volají `_db.SaveChangesAsync(ct)`:
+  ```csharp
+  var user = await _db.Users.FindAsync([id], ct) ?? throw new NotFoundException(...);
+  user.Nickname = request.Nickname;
+  await _db.SaveChangesAsync(ct);
+  ```
+
+Integrační testy přes Testcontainers běží nad reálnou PostgreSQL, takže repozitáře nejsou potřeba ani pro mockování. Vzor: `Features/EagleFeathers/UpdateOrCreateEagleFeatherCommand.cs`.
 
 ### Response objekty
 
-Každý model má dedikovaný response record/class v `Responses/` se statickou factory metodou `FromModel()`. Nikdy nevracej EF entity přímo z controlleru.
+Každý typ výstupu má dedikovaný record v `Responses/`. Nikdy nevracej EF entity přímo z controlleru — v queries vytvoř response přes `.Select(u => new XxxResponse(...))` v handleru, v commands po `SaveChangesAsync` vrať `new XxxResponse(...)` z namutované entity.
 
 ### Testy
 
@@ -255,6 +274,14 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 |---|---|---|---|---|
 | GET | `/api/eagle-feathers` | ne | `EagleFeatherResponse[]` (200) | Všechna pera |
 | GET | `/api/eagle-feathers/{id}` | ne | `EagleFeatherResponse` (200) | Jedno pero |
+
+### Users (`/api/users`, `/api/user`)
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| GET | `/api/users/{id}` | ano | — | `UserResponse` (200) | Profil uživatele podle ID |
+| PUT | `/api/user` | ano | `UpdateUserRequest` | `UserResponse` (200) | Aktualizace vlastního profilu |
+| DELETE | `/api/user` | ano | — | 204 No Content | Smazání vlastního účtu (včetně refresh tokenů) |
 
 ---
 

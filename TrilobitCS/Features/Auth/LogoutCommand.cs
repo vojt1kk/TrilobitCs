@@ -1,6 +1,7 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
+using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
-using TrilobitCS.Repositories;
 using TrilobitCS.Requests;
 
 namespace TrilobitCS.Features.Auth;
@@ -10,11 +11,11 @@ public record LogoutCommand(RefreshRequest Request) : IRequest;
 // Laravel: Auth::logout() — zneplatní token konkrétního zařízení
 public class LogoutHandler : IRequestHandler<LogoutCommand>
 {
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly AppDbContext _db;
 
-    public LogoutHandler(IRefreshTokenRepository refreshTokenRepository)
+    public LogoutHandler(AppDbContext db)
     {
-        _refreshTokenRepository = refreshTokenRepository;
+        _db = db;
     }
 
     public async Task Handle(LogoutCommand command, CancellationToken cancellationToken)
@@ -22,10 +23,11 @@ public class LogoutHandler : IRequestHandler<LogoutCommand>
         if (string.IsNullOrEmpty(command.Request.RefreshToken))
             throw new UnauthorizedException();
 
-        var token = await _refreshTokenRepository.FindWithUser(command.Request.RefreshToken, cancellationToken)
+        var token = await _db.RefreshTokens
+            .FirstOrDefaultAsync(t => t.Token == command.Request.RefreshToken, cancellationToken)
             ?? throw new NotFoundException("errors.invalid_refresh_token");
 
         token.RevokedAt = DateTime.UtcNow;
-        await _refreshTokenRepository.Save(cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
     }
 }

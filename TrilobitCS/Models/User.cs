@@ -1,5 +1,3 @@
-using TrilobitCS.Dto;
-
 namespace TrilobitCS.Models;
 
 // Laravel: App\Models\User
@@ -15,16 +13,4 @@ public class User
     public DateOnly BirthDate { get; set; }
     public string? ProfilePicture { get; set; }
     public DateTime CreatedAt { get; set; }
-
-    public static User FromDto(CreateUserDto dto) => new()
-    {
-        Nickname = dto.Nickname,
-        FirstName = dto.FirstName,
-        LastName = dto.LastName,
-        Email = dto.Email,
-        Password = dto.HashedPassword,
-        Gender = dto.Gender,
-        BirthDate = dto.BirthDate,
-        CreatedAt = DateTime.UtcNow,
-    };
 }

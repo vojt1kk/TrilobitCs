@@ -1,6 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using MicroElements.Swashbuckle.FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +11,6 @@ using TrilobitCS.Auth;
 using TrilobitCS.Console;
 using TrilobitCS.Data;
 using TrilobitCS.Middleware;
-using TrilobitCS.Repositories;
 using TrilobitCS.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,19 +24,28 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Laravel: Hash::make() a Hash::check()
 builder.Services.AddScoped<BcryptPasswordHasher>();
 
-// Laravel: App\Repositories\UserRepository
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-
 // Laravel: php artisan make:auth → JWT service pro generování tokenů
 builder.Services.AddScoped<JwtTokenService>();
 
 // Laravel: config/auth.php — 'driver' => 'jwt'
-var jwtKey = builder.Configuration["Jwt:Key"]
-    ?? throw new InvalidOperationException("JWT Key not configured.");
+// Čtení klíče uvnitř lambdy: konfigurace se aplikuje deferred (při prvním authenticate),
+// takže WebApplicationFactory test override přes ConfigureAppConfiguration se projeví.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        var jwtKey = builder.Configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException("JWT Key not configured.");
+
+        // Legacy handler mapuje JWT claim 'sub' → ClaimTypes.NameIdentifier, na který
+        // se spoléhá UsersController. Nový JsonWebTokenHandler toto mapování nedělá.
+        options.TokenHandlers.Clear();
+        options.TokenHandlers.Add(new JwtSecurityTokenHandler());
+
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        {
+            KeyId = JwtSigningKey.KeyId,
+        };
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -44,7 +54,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = signingKey,
         };
     });
 
@@ -92,6 +102,9 @@ builder.Services.AddSwaggerGen(options =>
 // Laravel: FormRequest::rules()
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Propustí FluentValidation pravidla do Swagger schématu (max length, required, ...)
+builder.Services.AddFluentValidationRulesToSwagger();
 
 // Validation errors → 422 místo výchozích 400
 builder.Services.Configure<ApiBehaviorOptions>(options =>

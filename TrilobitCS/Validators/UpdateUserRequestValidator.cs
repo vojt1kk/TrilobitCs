@@ -3,10 +3,10 @@ using TrilobitCS.Requests;
 
 namespace TrilobitCS.Validators;
 
-// Laravel: App\Http\Requests\RegisterRequest::rules()
-public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
+// Laravel: App\Http\Requests\UpdateUserRequest::rules()
+public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 {
-    public RegisterRequestValidator()
+    public UpdateUserRequestValidator()
     {
         RuleFor(x => x.Nickname)
             .NotEmpty()
@@ -23,22 +23,14 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
             .MinimumLength(3)
             .MaximumLength(20);
 
-        RuleFor(x => x.Email)
-            .NotEmpty()
-            .MinimumLength(6)
-            .EmailAddress();
-
-        RuleFor(x => x.Password)
-            .NotEmpty()
-            .MinimumLength(10);
-
-        // Laravel: 'password' => ['confirmed']
-        RuleFor(x => x.PasswordConfirm)
-            .Equal(x => x.Password)
-            .WithMessage("'Password Confirm' must match 'Password'.");
+        RuleFor(x => x.Gender)
+            .IsInEnum();
 
         RuleFor(x => x.BirthDate)
             .NotEmpty()
             .LessThan(DateOnly.FromDateTime(DateTime.Today));
+
+        RuleFor(x => x.ProfilePicture)
+            .MaximumLength(255);
     }
 }
