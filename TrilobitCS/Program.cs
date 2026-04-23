@@ -132,7 +132,10 @@ if (args.Contains("scrape"))
 }
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "TrilobitCS v1");
+});
 
 // Laravel: app/Exceptions/Handler.php
 app.UseMiddleware<ExceptionHandlerMiddleware>();
