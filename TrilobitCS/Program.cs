@@ -64,6 +64,13 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Pr
 builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
 builder.Services.AddControllers();
 
+// Response compression: odpověď dorazí na reverse proxy (Cloudflare před Renderem)
+// už komprimovaná (gzip), takže CF ji nepřekompresuje rozbitým brotli — viz Swagger UI issue.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
 // Laravel ekvivalent: L5-Swagger / Scribe — generování API dokumentace
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -130,6 +137,8 @@ if (args.Contains("scrape"))
     await command.ExecuteAsync(System.Console.WriteLine);
     return;
 }
+
+app.UseResponseCompression();
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>
