@@ -141,7 +141,20 @@ if (args.Contains("scrape"))
     return;
 }
 
-app.UseResponseCompression();
+// Skip compression for /swagger paths and tell Cloudflare not to transform them.
+// Cloudflare's brotli transcoding on Render returns 0 bytes for dynamic content,
+// causing Swagger UI to fail with "does not specify a valid version field".
+// Cache-Control: no-transform is the authoritative opt-out for CDN transformation.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/swagger"),
+    branch => branch.UseResponseCompression()
+);
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/swagger"))
+        ctx.Response.Headers.CacheControl = "no-cache, no-transform";
+    await next();
+});
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>
