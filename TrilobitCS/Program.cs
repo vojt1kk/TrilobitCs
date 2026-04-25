@@ -64,9 +64,6 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Pr
 builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
 builder.Services.AddControllers();
 
-// Response compression: app zkomprimuje odpověď sám (gzip/brotli). Tím zabráníme,
-// aby to za nás dělal Cloudflare před Renderem — jejich brotli vrací 0 bytes a lámal
-// Swagger UI ("does not specify a valid version field").
 builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
@@ -141,19 +138,28 @@ if (args.Contains("scrape"))
     return;
 }
 
-// Skip compression for /swagger paths and tell Cloudflare not to transform them.
-// Cloudflare's brotli transcoding on Render returns 0 bytes for dynamic content,
-// causing Swagger UI to fail with "does not specify a valid version field".
-// Cache-Control: no-transform is the authoritative opt-out for CDN transformation.
-app.UseWhen(
-    ctx => !ctx.Request.Path.StartsWithSegments("/swagger"),
-    branch => branch.UseResponseCompression()
-);
+app.UseResponseCompression();
+
+// Swagger UI 5.17.14 (embedded in Swashbuckle 6.x) only accepts openapi: "3.0.[0-3]"
+// via regex /^3\.0\.([0123])(?:-rc[012])?$/. Microsoft.OpenApi 1.6+ generates "3.0.4",
+// so we normalize the version string before it reaches the browser.
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Path.StartsWithSegments("/swagger"))
-        ctx.Response.Headers.CacheControl = "no-cache, no-transform";
+    if (!ctx.Request.Path.StartsWithSegments("/swagger/v1/swagger.json"))
+    {
+        await next();
+        return;
+    }
+    var original = ctx.Response.Body;
+    using var buffer = new MemoryStream();
+    ctx.Response.Body = buffer;
     await next();
+    buffer.Seek(0, SeekOrigin.Begin);
+    var json = await new StreamReader(buffer).ReadToEndAsync();
+    json = json.Replace("\"openapi\": \"3.0.4\"", "\"openapi\": \"3.0.1\"");
+    ctx.Response.Body = original;
+    ctx.Response.ContentLength = System.Text.Encoding.UTF8.GetByteCount(json);
+    await ctx.Response.WriteAsync(json);
 });
 
 app.UseSwagger();
