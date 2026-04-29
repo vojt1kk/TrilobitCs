@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<OrganisationInvite> OrganisationInvites => Set<OrganisationInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,8 +41,6 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Organisation>(entity =>
         {
-            entity.HasIndex(o => o.InviteCode).IsUnique();
-
             entity.HasOne(o => o.Leader)
                 .WithMany()
                 .HasForeignKey(o => o.LeaderId)
@@ -168,6 +167,29 @@ public class AppDbContext : DbContext
                 .WithMany(c => c.Replies)
                 .HasForeignKey(c => c.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OrganisationInvite>(entity =>
+        {
+            // Partial unique index: jedna pending pozvánka na (invited_user, org)
+            entity.HasIndex(i => new { i.InvitedUserId, i.OrganisationId })
+                .IsUnique()
+                .HasFilter("\"Status\" = 0");
+
+            entity.HasOne(i => i.Organisation)
+                .WithMany(o => o.Invites)
+                .HasForeignKey(i => i.OrganisationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(i => i.InvitedUser)
+                .WithMany(u => u.ReceivedInvites)
+                .HasForeignKey(i => i.InvitedUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(i => i.InvitedBy)
+                .WithMany()
+                .HasForeignKey(i => i.InvitedById)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

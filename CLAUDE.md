@@ -160,35 +160,38 @@ TrilobitCS/
 ├── Console/
 │   └── ScrapeEagleFeathersCommand.cs  # dotnet run -- scrape
 ├── Controllers/
-│   ├── AuthController.cs           # POST /api/auth/{register,login,refresh,logout}
-│   └── EagleFeathersController.cs  # GET /api/eagle-feathers, GET /api/eagle-feathers/{id}
-├── Controllers/
-│   ├── AuthController.cs           # POST /api/auth/{register,login,refresh,logout}
-│   ├── EagleFeathersController.cs  # GET /api/eagle-feathers
-│   └── UsersController.cs          # GET /api/users/{id}, PUT/DELETE /api/user
+│   ├── AuthController.cs              # POST /api/auth/{register,login,refresh,logout}
+│   ├── EagleFeathersController.cs     # GET /api/eagle-feathers, GET /api/eagle-feathers/{id}
+│   ├── MembershipRequestsController.cs # POST|GET /api/membership-requests, POST /api/membership-requests/{id}/{approve,reject}
+│   ├── OrganisationsController.cs     # POST|GET /api/organisations, PUT|GET /api/organisations/{id}, GET /api/organisations/{id}/members
+│   └── UsersController.cs             # GET /api/users/{id}, PUT/DELETE /api/user, DELETE /api/user/organisation
 ├── Data/
 │   └── AppDbContext.cs             # EF Core DbContext — používá se přímo v handlerech
 ├── Exceptions/                     # NotFoundException, ConflictException, UnauthorizedException
 ├── Features/                       # CQRS handlery (MediatR)
 │   ├── Auth/                       # RegisterCommand, LoginCommand, LogoutCommand, RefreshCommand
 │   ├── EagleFeathers/              # UpdateOrCreateEagleFeatherCommand
-│   └── Users/                      # GetUserQuery, UpdateUserCommand, DeleteUserCommand
+│   ├── MembershipRequests/         # SubmitMembershipRequestCommand, GetPendingMembershipRequestsQuery, ApproveMembershipRequestCommand, RejectMembershipRequestCommand
+│   ├── Organisations/              # CreateOrganisationCommand, GetOrganisationQuery, UpdateOrganisationCommand, GetOrganisationMembersQuery
+│   └── Users/                      # GetUserQuery, UpdateUserCommand, DeleteUserCommand, LeaveOrganisationCommand
 ├── Middleware/
 │   └── ExceptionHandlerMiddleware.cs
 ├── Migrations/
-├── Models/                         # EF Core entity (User, EagleFeather, RefreshToken, Gender)
-├── Requests/                       # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest
-├── Responses/                      # AuthResponse, EagleFeatherResponse, UserResponse
+├── Models/                         # EF Core entity (User, Organisation, MembershipRequest, EagleFeather, RefreshToken, Gender, UserRole, MembershipRequestStatus, ...)
+├── Requests/                       # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest, CreateOrganisationRequest, UpdateOrganisationRequest, SubmitMembershipRequestRequest
+├── Responses/                      # AuthResponse, EagleFeatherResponse, UserResponse, OrganisationResponse, OrganisationMemberResponse, MembershipRequestResponse
 ├── Services/
 │   └── SvitekScraper.cs            # Scraper woodcraft.cz (Windows-1250 encoding)
-└── Validators/                     # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator
+└── Validators/                     # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator, CreateOrganisationRequestValidator, UpdateOrganisationRequestValidator, SubmitMembershipRequestValidator
 
 TrilobitCS.Tests/
 ├── ApiCollection.cs                # Sdílí 1 PostgreSQL kontejner napříč testy [Collection("Api")]
 ├── TrilobitWebApplicationFactory.cs
 ├── Auth/                           # RegisterApiTests, LoginApiTests, LogoutApiTests, RefreshApiTests
-├── Users/                          # GetUserApiTests, UpdateUserApiTests, DeleteUserApiTests
-└── Factories/                      # RegisterRequestFactory, UpdateUserRequestFactory (Bogus)
+├── MembershipRequests/             # SubmitMembershipRequestApiTests, ApproveMembershipRequestApiTests, RejectMembershipRequestApiTests
+├── Organisations/                  # CreateOrganisationApiTests, GetOrganisationApiTests, LeaveOrganisationApiTests
+├── Users/                          # UsersApiTests (GET, PUT, DELETE, Leave Organisation)
+└── Factories/                      # RegisterRequestFactory, UpdateUserRequestFactory, CreateOrganisationRequestFactory, SubmitMembershipRequestRequestFactory (Bogus)
 ```
 
 ---
@@ -228,7 +231,8 @@ Výjimky se zahazují v `Features/` handlerech, middleware je mapuje na HTTP odp
 |---|---|---|
 | `UnauthorizedException` | 401 | Neplatné přihlašovací údaje, neplatný token |
 | `NotFoundException` | 404 | Entita nenalezena |
-| `ConflictException` | 422 | Duplicita (email, nickname) |
+| `ConflictException` | 422 | Duplicita nebo porušení business rule |
+| `ForbiddenException` | 403 | Nedostatečná oprávnění (např. non-Leader volá Leader-only endpoint) |
 
 Response body: `{ "message": "..." }` — zpráva je i18n klíč (např. `"errors.email_taken"`).
 
@@ -313,6 +317,83 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 | GET | `/api/users/{id}` | ano | — | `UserResponse` (200) | Profil uživatele podle ID |
 | PUT | `/api/user` | ano | `UpdateUserRequest` | `UserResponse` (200) | Aktualizace vlastního profilu |
 | DELETE | `/api/user` | ano | — | 204 No Content | Smazání vlastního účtu (včetně refresh tokenů) |
+| DELETE | `/api/user/organisation` | ano | — | 204 No Content | Odchod z organizace (Leader vlastní org blokován) |
+
+### Organisations (`/api/organisations`)
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/organisations` | Leader | `CreateOrganisationRequest` | `OrganisationResponse` (200) | Vytvoří org, leader_id = current user, vygeneruje invite_code |
+| GET | `/api/organisations/{id}` | ano | — | `OrganisationResponse` (200) | Detail organizace s počtem členů |
+| PUT | `/api/organisations/{id}` | Leader dané org | `UpdateOrganisationRequest` | `OrganisationResponse` (200) | Aktualizace org (jen vlastní org) |
+| GET | `/api/organisations/{id}/members` | ano | — | `OrganisationMemberResponse[]` (200) | Seznam členů organizace |
+
+**CreateOrganisationRequest:**
+```json
+{
+  "name": "string (max 100, required)",
+  "description": "string (max 1000, optional)",
+  "avatarUrl": "string (max 255, optional)"
+}
+```
+
+**UpdateOrganisationRequest** — všechna pole optional, aktualizují se jen vyplněná:
+```json
+{
+  "name": "string (max 100)",
+  "description": "string (max 1000)",
+  "avatarUrl": "string (max 255)",
+  "inviteCode": "string (max 20)"
+}
+```
+
+**OrganisationResponse:**
+```json
+{
+  "id": 1,
+  "name": "Skautský oddíl Liška",
+  "description": "...",
+  "avatarUrl": null,
+  "inviteCode": "AB12CD34",
+  "memberCount": 5,
+  "leader": { "id": 1, "nickname": "vedouci123" },
+  "createdAt": "2026-04-25T..."
+}
+```
+
+### Membership Requests (`/api/membership-requests`)
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/membership-requests` | ano | `SubmitMembershipRequestRequest` | `MembershipRequestResponse` (200) | Podá žádost o členství (přes invite_code) |
+| GET | `/api/membership-requests` | Leader | — | `MembershipRequestResponse[]` (200) | Pending žádosti do leaderovy org |
+| POST | `/api/membership-requests/{id}/approve` | Leader | — | `MembershipRequestResponse` (200) | Schválí žádost, nastaví user.organisation_id, auto-rejectuje ostatní pending žádosti uživatele |
+| POST | `/api/membership-requests/{id}/reject` | Leader | — | `MembershipRequestResponse` (200) | Zamítne žádost |
+
+**SubmitMembershipRequestRequest:**
+```json
+{ "inviteCode": "AB12CD34" }
+```
+
+**MembershipRequestResponse:**
+```json
+{
+  "id": 1,
+  "userId": 5,
+  "nickname": "novacek99",
+  "organisationId": 2,
+  "status": 0,
+  "createdAt": "2026-04-25T..."
+}
+```
+Status: `0` = Pending, `1` = Approved, `2` = Rejected
+
+**Business rules:**
+- Submit blokován pokud `user.organisation_id != null` → 422
+- Neplatný invite_code → 404
+- Duplicitní pending na stejnou org → 422
+- Approve: atomicky nastaví `user.organisation_id`, auto-rejectuje ostatní pending žádosti uživatele
+- Approve/Reject blokován pokud request není Pending → 422
 
 ---
 
@@ -327,11 +408,11 @@ users
   last_name       varchar(100) NOT NULL
   email           varchar(100) UNIQUE NOT NULL
   password        varchar(255) NOT NULL        -- bcrypt hash
-  gender          varchar(10)                  -- Male | Female | Other
+  gender          int          NOT NULL        -- enum: 0=Male, 1=Female, 2=Other
   birth_date      date         NOT NULL
   profile_picture varchar(255)
-  role            varchar(20)  DEFAULT 'user' -- user | leader
-  organisation_id int          FK → organisations.id (nullable)
+  role            int          DEFAULT 0       -- enum: 0=User, 1=Leader (přiřazuje superadmin v DB)
+  organisation_id int          FK → organisations.id (nullable, SetNull on delete)
   created_at      timestamp    DEFAULT now()
 
 refresh_tokens
@@ -345,7 +426,7 @@ refresh_tokens
 
 eagle_feathers
   id              PK
-  light           tinyint      NOT NULL        -- 1=1.světlo ... 4=4.světlo
+  light           smallint     NOT NULL        -- 1=1.světlo ... 4=4.světlo
   section         varchar(10)  NOT NULL        -- 1A, 1B, 2A, ...
   number          smallint     NOT NULL        -- pořadí v rámci sekce
   name            varchar(150) NOT NULL
@@ -354,9 +435,28 @@ eagle_feathers
   source_url      varchar(255) NOT NULL
   created_at      timestamp
   updated_at      timestamp
-  UNIQUE(section, number)
+  UNIQUE(light, section, number)
 
--- ZATÍM NEIMPLEMENTOVÁNO
+organisations
+  id          PK
+  name        varchar(100) NOT NULL
+  description text
+  avatar_url  varchar(255)
+  invite_code varchar(20)  UNIQUE              -- auto-generovaný 8-char kód při vytvoření org
+  leader_id   int          NOT NULL FK → users.id (Restrict on delete)
+  created_at  timestamp    DEFAULT now()
+
+membership_requests
+  id              PK
+  user_id         FK → users.id (Cascade delete)
+  organisation_id FK → organisations.id (Cascade delete)
+  status          int          DEFAULT 0       -- enum: 0=Pending, 1=Approved, 2=Rejected
+  reviewed_by     FK → users.id (nullable, SetNull on delete)
+  reviewed_at     timestamp    (nullable)
+  created_at      timestamp    DEFAULT now()
+  UNIQUE(user_id, organisation_id) WHERE status = 0  -- partial index: jen jedna pending žádost na (user, org)
+
+-- ZATÍM NEIMPLEMENTOVÁNO (modely v DB existují, žádné API)
 followers
   id            PK
   follower_id   FK → users.id
@@ -369,41 +469,38 @@ user_eagle_feathers
   user_id          FK → users.id
   eagle_feather_id FK → eagle_feathers.id
   is_grand_challenge boolean DEFAULT false     -- false=čin, true=velký čin
-  status           varchar(20) DEFAULT 'pending' -- pending | approved | rejected
+  status           int          DEFAULT 0      -- enum: 0=Pending, 1=Approved, 2=Rejected
   verified_by      FK → users.id (leader, nullable)
   earned_at        timestamp (nullable)
   created_at       timestamp
   UNIQUE(user_id, eagle_feather_id)
 
-organisations
-  id          PK
-  name        varchar(100) NOT NULL
-  description text
-  avatar_url  varchar(255)
-  invite_code varchar(20)  UNIQUE
-  created_at  timestamp
-
 posts
-  id                    PK
-  user_id               FK → users.id
-  organisation_id       FK → organisations.id (nullable — null = jen pro followers)
-  eagle_feather_id      FK → eagle_feathers.id (nullable — post o získání pera)
+  id                      PK
+  user_id                 FK → users.id
+  organisation_id         FK → organisations.id (nullable — null = jen pro followers)
+  eagle_feather_id        FK → eagle_feathers.id (nullable — post o získání pera)
   challenge_completion_id FK → challenge_completions.id (nullable — post o splnění výzvy)
-  content               text
-  image_url             varchar(255)
-  created_at            timestamp
+  content                 text
+  image_url               varchar(255)
+  created_at              timestamp
 
-post_likes
-  id         PK
-  post_id    FK → posts.id
-  user_id    FK → users.id
-  created_at timestamp
-  UNIQUE(post_id, user_id)
+likes
+  id             PK
+  user_id        FK → users.id
+  likeable_type  int          -- enum: 0=Posts, 1=Comments
+  likeable_id    int
+  post_id        FK → posts.id (nullable)
+  comment_id     FK → comments.id (nullable)
+  created_at     timestamp
+  UNIQUE(user_id, likeable_type, likeable_id)
+  INDEX(likeable_type, likeable_id)
 
 comments
   id               PK
   user_id          FK → users.id
-  commentable_type varchar(50)  -- 'posts' | 'comments'
+  post_id          FK → posts.id (nullable — null pokud je reply)
+  commentable_type int          -- enum: 0=Posts, 1=Comments
   commentable_id   int
   parent_id        FK → comments.id (nullable — null=top-level, jinak reply)
   content          text NOT NULL

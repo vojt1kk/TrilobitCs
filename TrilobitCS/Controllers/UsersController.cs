@@ -59,4 +59,20 @@ public class UsersController : ControllerBase
         await _mediator.Send(new DeleteUserCommand(userId));
         return NoContent();
     }
+
+    // DELETE /api/user/organisation
+    /// <summary>Odchod z organizace (Leader vlastní org nemůže odejít)</summary>
+    /// <response code="204">Odchod úspěšný</response>
+    /// <response code="401">Nepřihlášený uživatel</response>
+    /// <response code="422">Uživatel není v organizaci nebo je Leader</response>
+    [HttpDelete("api/user/organisation")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> LeaveOrganisation()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        await _mediator.Send(new LeaveOrganisationCommand(userId));
+        return NoContent();
+    }
 }
