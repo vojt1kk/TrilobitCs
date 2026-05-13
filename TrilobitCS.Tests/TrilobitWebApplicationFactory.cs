@@ -26,6 +26,8 @@ public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAs
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>

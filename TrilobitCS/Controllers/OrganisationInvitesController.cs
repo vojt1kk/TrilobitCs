@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrilobitCS.Extensions;
 using TrilobitCS.Features.OrganisationInvites;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
@@ -32,11 +32,8 @@ public class OrganisationInvitesController : ControllerBase
     [ProducesResponseType(403)]
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Send(SendOrganisationInviteRequest request)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new SendOrganisationInviteCommand(userId, request)));
-    }
+    public async Task<IActionResult> Send(SendOrganisationInviteRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new SendOrganisationInviteCommand(User.GetUserId(), request), ct));
 
     // GET /api/organisation-invites
     /// <summary>Vrátí pozvánky přihlášeného uživatele (všechny statusy)</summary>
@@ -45,11 +42,8 @@ public class OrganisationInvitesController : ControllerBase
     [HttpGet("api/organisation-invites")]
     [ProducesResponseType(typeof(IEnumerable<OrganisationInviteResponse>), 200)]
     [ProducesResponseType(401)]
-    public async Task<IActionResult> Index()
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new GetOrganisationInvitesQuery(userId)));
-    }
+    public async Task<IActionResult> Index(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOrganisationInvitesQuery(User.GetUserId()), ct));
 
     // POST /api/organisation-invites/{id}/accept
     /// <summary>Přijme pozvánku (pozvaný uživatel)</summary>
@@ -62,11 +56,8 @@ public class OrganisationInvitesController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Accept(int id)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new AcceptOrganisationInviteCommand(userId, id)));
-    }
+    public async Task<IActionResult> Accept(int id, CancellationToken ct)
+        => Ok(await _mediator.Send(new AcceptOrganisationInviteCommand(User.GetUserId(), id), ct));
 
     // POST /api/organisation-invites/{id}/decline
     /// <summary>Odmítne pozvánku (pozvaný uživatel)</summary>
@@ -79,9 +70,6 @@ public class OrganisationInvitesController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Decline(int id)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new DeclineOrganisationInviteCommand(userId, id)));
-    }
+    public async Task<IActionResult> Decline(int id, CancellationToken ct)
+        => Ok(await _mediator.Send(new DeclineOrganisationInviteCommand(User.GetUserId(), id), ct));
 }

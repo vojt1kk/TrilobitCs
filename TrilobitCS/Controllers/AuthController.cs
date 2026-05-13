@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TrilobitCS.Features.Auth;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
@@ -24,28 +25,32 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     [ProducesResponseType(typeof(AuthResponse), 200)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Register(RegisterRequest request)
-        => Ok(await _mediator.Send(new RegisterCommand(request)));
+    public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new RegisterCommand(request), ct));
 
     // POST /api/auth/login
     /// <summary>Log in with nickname and password</summary>
     /// <response code="200">Returns access token and refresh token</response>
     /// <response code="401">Invalid credentials</response>
+    /// <response code="429">Too many requests</response>
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(AuthResponse), 200)]
     [ProducesResponseType(401)]
-    public async Task<IActionResult> Login(LoginRequest request)
-        => Ok(await _mediator.Send(new LoginCommand(request)));
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new LoginCommand(request), ct));
 
     // POST /api/auth/refresh
     /// <summary>Exchange a refresh token for a new token pair (rotation)</summary>
     /// <response code="200">Returns new access token and refresh token</response>
     /// <response code="401">Invalid or already used refresh token</response>
+    /// <response code="429">Too many requests</response>
     [HttpPost("refresh")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(AuthResponse), 200)]
     [ProducesResponseType(401)]
-    public async Task<IActionResult> Refresh(RefreshRequest request)
-        => Ok(await _mediator.Send(new RefreshCommand(request)));
+    public async Task<IActionResult> Refresh(RefreshRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new RefreshCommand(request), ct));
 
     // POST /api/auth/logout
     /// <summary>Log out — revoke the refresh token</summary>
@@ -54,9 +59,9 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Logout(RefreshRequest request)
+    public async Task<IActionResult> Logout(RefreshRequest request, CancellationToken ct)
     {
-        await _mediator.Send(new LogoutCommand(request));
+        await _mediator.Send(new LogoutCommand(request), ct);
         return NoContent();
     }
 }

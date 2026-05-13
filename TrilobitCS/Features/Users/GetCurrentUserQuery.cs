@@ -6,27 +6,32 @@ using TrilobitCS.Responses;
 
 namespace TrilobitCS.Features.Users;
 
-public record GetUserQuery(int UserId) : IRequest<PublicUserResponse>;
+public record GetCurrentUserQuery(int UserId) : IRequest<UserMeResponse>;
 
-// Laravel: UserController@show
-public class GetUserHandler : IRequestHandler<GetUserQuery, PublicUserResponse>
+// Laravel: UserController@me
+public class GetCurrentUserHandler : IRequestHandler<GetCurrentUserQuery, UserMeResponse>
 {
     private readonly AppDbContext _db;
 
-    public GetUserHandler(AppDbContext db)
+    public GetCurrentUserHandler(AppDbContext db)
     {
         _db = db;
     }
 
-    public async Task<PublicUserResponse> Handle(GetUserQuery query, CancellationToken cancellationToken)
+    public async Task<UserMeResponse> Handle(GetCurrentUserQuery query, CancellationToken cancellationToken)
         => await _db.Users
             .Where(u => u.Id == query.UserId)
-            .Select(u => new PublicUserResponse(
+            .Select(u => new UserMeResponse(
                 u.Id,
                 u.Nickname,
                 u.FirstName,
                 u.LastName,
+                u.Email,
+                u.Gender,
+                u.BirthDate,
                 u.ProfilePicture,
+                u.Role,
+                u.OrganisationId,
                 u.CreatedAt))
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("errors.user_not_found");

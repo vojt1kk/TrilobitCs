@@ -1,5 +1,6 @@
 using FluentValidation;
 using TrilobitCS.Requests;
+using TrilobitCS.Validators.Shared;
 
 namespace TrilobitCS.Validators;
 
@@ -8,29 +9,14 @@ public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 {
     public UpdateUserRequestValidator()
     {
-        RuleFor(x => x.Nickname)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
+        RuleFor(x => x.Nickname).NicknameRules();
+        RuleFor(x => x.FirstName).FirstLastNameRules();
+        RuleFor(x => x.LastName).FirstLastNameRules();
 
-        RuleFor(x => x.FirstName)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
+        RuleFor(x => x.Gender).IsInEnum();
 
-        RuleFor(x => x.LastName)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
+        RuleFor(x => x.BirthDate).BirthDateRules();
 
-        RuleFor(x => x.Gender)
-            .IsInEnum();
-
-        RuleFor(x => x.BirthDate)
-            .NotEmpty()
-            .LessThan(DateOnly.FromDateTime(DateTime.Today));
-
-        RuleFor(x => x.ProfilePicture)
-            .MaximumLength(255);
+        RuleFor(x => x.ProfilePicture).MaximumLength(255);
     }
 }

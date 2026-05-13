@@ -7,10 +7,10 @@ using TrilobitCS.Responses;
 
 namespace TrilobitCS.Features.Users;
 
-public record UpdateUserCommand(int UserId, UpdateUserRequest Request) : IRequest<UserResponse>;
+public record UpdateUserCommand(int UserId, UpdateUserRequest Request) : IRequest<UserMeResponse>;
 
 // Laravel: UserController@update
-public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserResponse>
+public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserMeResponse>
 {
     private readonly AppDbContext _db;
 
@@ -19,7 +19,7 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserResponse
         _db = db;
     }
 
-    public async Task<UserResponse> Handle(UpdateUserCommand command, CancellationToken cancellationToken)
+    public async Task<UserMeResponse> Handle(UpdateUserCommand command, CancellationToken cancellationToken)
     {
         var user = await _db.Users.FindAsync([command.UserId], cancellationToken)
             ?? throw new NotFoundException("errors.user_not_found");
@@ -39,7 +39,7 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserResponse
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        return new UserResponse(
+        return new UserMeResponse(
             user.Id,
             user.Nickname,
             user.FirstName,
@@ -48,6 +48,8 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserResponse
             user.Gender,
             user.BirthDate,
             user.ProfilePicture,
+            user.Role,
+            user.OrganisationId,
             user.CreatedAt
         );
     }

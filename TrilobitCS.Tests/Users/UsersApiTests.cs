@@ -27,7 +27,7 @@ public class UsersApiTests
     // GET /api/users/{id}
 
     [Fact]
-    public async Task GetUser_Authenticated_Returns200WithProfile()
+    public async Task GetUser_Authenticated_Returns200WithPublicProfile()
     {
         var accessToken = await RegisterAndGetToken();
 
@@ -44,8 +44,32 @@ public class UsersApiTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("nickname").GetString().Should().Be(secondUser.Nickname);
-        body.GetProperty("email").GetString().Should().Be(secondUser.Email);
+        body.TryGetProperty("email", out _).Should().BeFalse("veřejný profil nesmí obsahovat email");
         body.TryGetProperty("password", out _).Should().BeFalse("response nesmí obsahovat hash hesla");
+    }
+
+    [Fact]
+    public async Task GetCurrentUser_Authenticated_ReturnsProfileWithEmail()
+    {
+        var registerRequest = RegisterRequestFactory.Make();
+        var accessToken = await RegisterAndGetToken(registerRequest);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _client.GetAsync("/api/user/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("nickname").GetString().Should().Be(registerRequest.Nickname);
+        body.GetProperty("email").GetString().Should().Be(registerRequest.Email);
+        body.TryGetProperty("password", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetCurrentUser_Unauthenticated_Returns401()
+    {
+        var response = await _client.GetAsync("/api/user/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrilobitCS.Extensions;
 using TrilobitCS.Features.Organisations;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
@@ -30,11 +30,8 @@ public class OrganisationsController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Create(CreateOrganisationRequest request)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new CreateOrganisationCommand(userId, request)));
-    }
+    public async Task<IActionResult> Create(CreateOrganisationRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new CreateOrganisationCommand(User.GetUserId(), request), ct));
 
     // GET /api/organisations/{id}
     /// <summary>Vrátí detail organizace</summary>
@@ -45,8 +42,8 @@ public class OrganisationsController : ControllerBase
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Show(int id)
-        => Ok(await _mediator.Send(new GetOrganisationQuery(id)));
+    public async Task<IActionResult> Show(int id, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOrganisationQuery(id), ct));
 
     // PUT /api/organisations/{id}
     /// <summary>Aktualizuje organizaci (pouze Leader dané org)</summary>
@@ -54,18 +51,15 @@ public class OrganisationsController : ControllerBase
     /// <response code="401">Nepřihlášený uživatel</response>
     /// <response code="403">Uživatel není Leader této organizace</response>
     /// <response code="404">Organizace nenalezena</response>
-    /// <response code="422">Nevalidní data nebo invite_code obsazen</response>
+    /// <response code="422">Nevalidní data</response>
     [HttpPut("api/organisations/{id:int}")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
-    public async Task<IActionResult> Update(int id, UpdateOrganisationRequest request)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        return Ok(await _mediator.Send(new UpdateOrganisationCommand(userId, id, request)));
-    }
+    public async Task<IActionResult> Update(int id, UpdateOrganisationRequest request, CancellationToken ct)
+        => Ok(await _mediator.Send(new UpdateOrganisationCommand(User.GetUserId(), id, request), ct));
 
     // GET /api/organisations/{id}/members
     /// <summary>Vrátí seznam členů organizace</summary>
@@ -76,6 +70,6 @@ public class OrganisationsController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<OrganisationMemberResponse>), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Members(int id)
-        => Ok(await _mediator.Send(new GetOrganisationMembersQuery(id)));
+    public async Task<IActionResult> Members(int id, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOrganisationMembersQuery(id), ct));
 }

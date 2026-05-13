@@ -2,8 +2,8 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Responses;
 
-// Laravel: UserResource — veřejný tvar profilu uživatele (bez hashe hesla)
-public record UserResponse(
+// Laravel: UserResource — vlastní profil (s emailem, role, organisationId)
+public record UserMeResponse(
     int Id,
     string Nickname,
     string FirstName,
@@ -12,5 +12,7 @@ public record UserResponse(
     Gender Gender,
     DateOnly BirthDate,
     string? ProfilePicture,
+    UserRole Role,
+    int? OrganisationId,
     DateTime CreatedAt
 );

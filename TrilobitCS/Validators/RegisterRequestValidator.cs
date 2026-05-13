@@ -1,5 +1,6 @@
 using FluentValidation;
 using TrilobitCS.Requests;
+using TrilobitCS.Validators.Shared;
 
 namespace TrilobitCS.Validators;
 
@@ -8,20 +9,9 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
     public RegisterRequestValidator()
     {
-        RuleFor(x => x.Nickname)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
-
-        RuleFor(x => x.FirstName)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
-
-        RuleFor(x => x.LastName)
-            .NotEmpty()
-            .MinimumLength(3)
-            .MaximumLength(20);
+        RuleFor(x => x.Nickname).NicknameRules();
+        RuleFor(x => x.FirstName).FirstLastNameRules();
+        RuleFor(x => x.LastName).FirstLastNameRules();
 
         RuleFor(x => x.Email)
             .NotEmpty()
@@ -37,8 +27,6 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
             .Equal(x => x.Password)
             .WithMessage("'Password Confirm' must match 'Password'.");
 
-        RuleFor(x => x.BirthDate)
-            .NotEmpty()
-            .LessThan(DateOnly.FromDateTime(DateTime.Today));
+        RuleFor(x => x.BirthDate).BirthDateRules();
     }
 }

@@ -33,13 +33,13 @@ Světlo (1–4)
 
 Každé pero má dvě varianty obtížnosti: **čin** (`challenge`) a **velký čin** (`grand_challenge`).
 
-**Workflow získání pera (user_eagle_feathers):**
-1. Dítě označí pero jako splněné a přiloží fotky → vytvoří se `user_eagle_feathers` se `status = pending` a po schválení i příspěvek s `eagle_feather_id`
+**Workflow získání pera (user_eagle_feathers) — zatím bez API:**
+1. Dítě označí pero jako splněné a přiloží fotky → vytvoří se `user_eagle_feathers` se `status = Pending` a po schválení i příspěvek s `eagle_feather_id`
 2. Vedoucí organizace uvidí příspěvek ke schválení
-3. Vedoucí schválí (`status = approved`, `verified_by = leader_id`, `earned_at = now()`) → příspěvek dostane vizuální potvrzení (fajfka), pero se počítá do leaderboardu
-4. Vedoucí zamítne (`status = rejected`)
+3. Vedoucí schválí (`status = Approved`, `verified_by = leader_id`, `earned_at = now()`) → příspěvek dostane vizuální potvrzení (fajfka), pero se počítá do leaderboardu
+4. Vedoucí zamítne (`status = Rejected`)
 
-Leaderboard počítá **pouze schválená pera** (`status = approved`). Detail rozdílu workflow čin vs. velký čin (`is_grand_challenge`) bude upřesněn.
+Leaderboard počítá **pouze schválená pera** (`status = Approved`). Detail rozdílu workflow čin vs. velký čin (`is_grand_challenge`) bude upřesněn.
 
 ### 3. Organizace
 
@@ -49,53 +49,35 @@ Každý uživatel patří do **jedné** organizace (1:N — `users.organisation_
 - `user` — běžný člen, výchozí role
 - `leader` — vedoucí organizace, přiřazuje superadmin mimo aplikaci
 
-**Workflow připojení k organizaci (MembershipRequest — plánováno, zatím neimplementováno):**
-1. Nepřiřazený uživatel (`users.organisation_id IS NULL`) → záložka Organizace → "Připojit se" → zadá `invite_code`
-2. Backend validuje kód proti `organisations.invite_code`, kód se **neukládá** na request (jen validace)
-3. Vytvoří se `MembershipRequest` se `status = Pending`
-4. Vedoucí cílové organizace uvidí pending žádosti, schválí nebo zamítne
-5. **Approve** (atomicky v transakci): `membership_request.status = Approved`, `reviewed_by`, `reviewed_at` + `users.organisation_id = org.id`
-6. **Reject**: jen nastaví `status = Rejected`, user zůstává bez organizace
+**Workflow pozvánky do organizace (OrganisationInvite — implementováno):**
 
-**Pravidla membership requests:**
-- Submit blokován, pokud `user.organisation_id != null` (přechod mezi organizacemi není podporován — nejdřív musí uživatel z organizace odejít)
-- Jen **jedna otevřená žádost** ke stejné organizaci: partial unique index `(user_id, organisation_id) WHERE status = 'Pending'`
-- **Více paralelních pending žádostí** do různých organizací je povoleno (auto-zamítnutí ostatních po approve je na handleru, ne v DB)
-- Rejected žádosti zůstávají v historii (nelze je vyfiltrovat z unique indexu)
+Přístup je **leader-driven**: leader pošle pozvánku konkrétnímu uživateli (podle nickname), uživatel ji přijme nebo odmítne.
 
-**Navrhovaná entita `MembershipRequest`:**
-```
-id              PK
-user_id         FK → users.id (žadatel, cascade delete)
-organisation_id FK → organisations.id (cílová org, cascade delete)
-status          int      -- Pending | Approved | Rejected (enum)
-reviewed_by     FK → users.id (leader, nullable, set null)
-reviewed_at     timestamp (nullable)
-created_at      timestamp
-UNIQUE(user_id, organisation_id) WHERE status = 'Pending'  -- partial index
-```
+1. Leader pošle pozvánku → `POST /api/organisation-invites` s `{ "nickname": "..." }` → vytvoří se `OrganisationInvite` se `status = Pending`
+2. Pozvaný uživatel vidí své pozvánky → `GET /api/organisation-invites`
+3. Uživatel přijme → `POST /api/organisation-invites/{id}/accept` → `user.organisation_id = invite.organisation_id`, ostatní pending pozvánky uživatele se auto-odmítnou
+4. Uživatel odmítne → `POST /api/organisation-invites/{id}/decline`
 
-**Plánovaná implementace (CQRS):**
-- `Features/MembershipRequests/SubmitMembershipRequestCommand` — validuje invite_code, kontroluje `user.organisation_id == null`, kontroluje absenci pending, vytvoří request
-- `Features/MembershipRequests/ApproveMembershipRequestCommand` — leader-only, transakce: nastaví status+reviewed_* + přiřadí `user.organisation_id`
-- `Features/MembershipRequests/RejectMembershipRequestCommand` — leader-only, jen update statusu
-- `Features/MembershipRequests/GetPendingMembershipRequestsQuery` — pro leadera, žádosti do jeho organizace
-- `MembershipRequestsController` pod `/api/membership-requests`
-- `Validators/SubmitMembershipRequestValidator` — `invite_code` required
-- `Responses/MembershipRequestResponse`
-- Integrační testy: submit happy path, duplicitní pending, user s organizací, invalid invite_code, approve flow (ověří `user.organisation_id`), reject flow
+**Pravidla:**
+- Pozvánku může poslat jen Leader, který má organizaci (`role = Leader && organisation_id IS NOT NULL`)
+- Nelze pozvat uživatele, který je již v organizaci → 422
+- Duplicitní pending pozvánka na stejnou (user, org) kombinaci → 422 (partial unique index)
+- Accept blokován pokud uživatel je mezitím přiřazen do jiné org → 422
+- Decline/Accept blokován pokud pozvánka není Pending → 422
+
+**Status enum `OrganisationInviteStatus`:** `0 = Pending`, `1 = Accepted`, `2 = Declined`
 
 **Podzáložky organizace:**
-1. **Feed** — příspěvky členů organizace (obdoba homepage, ale filtrované na danou organizaci)
-2. **Leaderboard** — žebříček aktivit v rámci týmu, pouze schválená pera
-3. **Memberlist** — seznam členů organizace
+1. **Feed** — příspěvky členů organizace (obdoba homepage, ale filtrované na danou organizaci) — **zatím bez API**
+2. **Leaderboard** — žebříček aktivit v rámci týmu, pouze schválená pera — **zatím bez API**
+3. **Memberlist** — seznam členů organizace (`GET /api/organisations/{id}/members`)
 
 ### 4. Profil uživatele
 
-- Příspěvky uživatele
-- Seznam získaných orlích per a statistiky (detaily zatím otevřené)
-- Profil může být **soukromý** — obsah vidí jen followers
-- Sledování je **jednostranné** (jako Instagram — bez schválení druhé strany)
+- Příspěvky uživatele — **zatím bez API**
+- Seznam získaných orlích per a statistiky — **zatím bez API**
+- Profil může být **soukromý** — obsah vidí jen followers — **zatím bez `is_private` pole**
+- Sledování je **jednostranné** (jako Instagram — bez schválení druhé strany) — **zatím bez API**
 
 ---
 
@@ -106,11 +88,12 @@ UNIQUE(user_id, organisation_id) WHERE status = 'Pending'  -- partial index
 | Framework | ASP.NET Core 9, .NET 9 |
 | Databáze | PostgreSQL 16 (dev/prod), PostgreSQL 17 (docker-compose) |
 | ORM | Entity Framework Core 9 + Npgsql |
-| Pattern | CQRS s MediatR 12 |
+| Pattern | CQRS s MediatR **12.x (pin na 12.4.\* — viz Architektonická rozhodnutí)** |
 | Auth | JWT (Microsoft.AspNetCore.Authentication.JwtBearer 9) |
 | Validace | FluentValidation.AspNetCore 11 |
 | Hesla | BCrypt.Net-Next 4 |
 | Scraping | HtmlAgilityPack 1.12 |
+| API docs | Microsoft.AspNetCore.OpenApi + Scalar UI |
 | Testy | xUnit 2, WebApplicationFactory, Testcontainers.PostgreSql 3, FluentAssertions 6, Bogus 35 |
 
 ### Konfigurace (appsettings.json)
@@ -126,9 +109,18 @@ UNIQUE(user_id, organisation_id) WHERE status = 'Pending'  -- partial index
     "Audience": "trilobit",
     "AccessTokenExpiresInMinutes": 15,
     "RefreshTokenExpiresInDays": 180
+  },
+  "Cors": {
+    "AllowedOrigins": ["http://localhost:5173", "http://localhost:3000"]
+  },
+  "Serilog": {
+    "MinimumLevel": { "Default": "Information" },
+    "WriteTo": [{ "Name": "Console" }]
   }
 }
 ```
+
+> ⚠️ **JWT poznámka:** `AccessTokenExpiresInMinutes` v `appsettings.json` je nastaveno na 7 dní pro pohodlí při vývoji. Pro produkci snížit na **15 minut**.
 
 ### Spuštění
 
@@ -146,6 +138,9 @@ docker-compose up
 dotnet test
 ```
 
+API dokumentace (Scalar UI): `http://localhost:5xxx/scalar/v1`
+OpenAPI JSON: `http://localhost:5xxx/openapi/v1.json`
+
 Migrace se spouštějí **automaticky při startu aplikace** (`db.Database.MigrateAsync()` v `Program.cs`).
 
 ---
@@ -155,43 +150,48 @@ Migrace se spouštějí **automaticky při startu aplikace** (`db.Database.Migra
 ```
 TrilobitCS/
 ├── Auth/
-│   ├── BcryptPasswordHasher.cs     # Hash::make() / Hash::check()
-│   └── JwtTokenService.cs          # GenerateAccessToken() + GenerateRefreshToken()
+│   ├── BcryptPasswordHasher.cs          # Hash::make() / Hash::check()
+│   └── JwtTokenService.cs               # GenerateAccessToken() + GenerateRefreshToken()
 ├── Console/
-│   └── ScrapeEagleFeathersCommand.cs  # dotnet run -- scrape
+│   └── ScrapeEagleFeathersCommand.cs    # dotnet run -- scrape
 ├── Controllers/
-│   ├── AuthController.cs              # POST /api/auth/{register,login,refresh,logout}
-│   ├── EagleFeathersController.cs     # GET /api/eagle-feathers, GET /api/eagle-feathers/{id}
-│   ├── MembershipRequestsController.cs # POST|GET /api/membership-requests, POST /api/membership-requests/{id}/{approve,reject}
-│   ├── OrganisationsController.cs     # POST|GET /api/organisations, PUT|GET /api/organisations/{id}, GET /api/organisations/{id}/members
-│   └── UsersController.cs             # GET /api/users/{id}, PUT/DELETE /api/user, DELETE /api/user/organisation
+│   ├── AuthController.cs                # POST /api/auth/{register,login,refresh,logout}
+│   ├── EagleFeathersController.cs       # GET /api/eagle-feathers[/{id}]  [Authorize]
+│   ├── OrganisationInvitesController.cs # POST|GET /api/organisation-invites, POST /api/organisation-invites/{id}/{accept,decline}
+│   ├── OrganisationsController.cs       # POST|GET /api/organisations[/{id}], PUT /api/organisations/{id}, GET /api/organisations/{id}/members
+│   └── UsersController.cs               # GET /api/users/{id}, GET|PUT|DELETE /api/user, DELETE /api/user/organisation
 ├── Data/
-│   └── AppDbContext.cs             # EF Core DbContext — používá se přímo v handlerech
-├── Exceptions/                     # NotFoundException, ConflictException, UnauthorizedException
-├── Features/                       # CQRS handlery (MediatR)
-│   ├── Auth/                       # RegisterCommand, LoginCommand, LogoutCommand, RefreshCommand
-│   ├── EagleFeathers/              # UpdateOrCreateEagleFeatherCommand
-│   ├── MembershipRequests/         # SubmitMembershipRequestCommand, GetPendingMembershipRequestsQuery, ApproveMembershipRequestCommand, RejectMembershipRequestCommand
-│   ├── Organisations/              # CreateOrganisationCommand, GetOrganisationQuery, UpdateOrganisationCommand, GetOrganisationMembersQuery
-│   └── Users/                      # GetUserQuery, UpdateUserCommand, DeleteUserCommand, LeaveOrganisationCommand
+│   └── AppDbContext.cs                  # EF Core DbContext — používá se přímo v handlerech
+├── Exceptions/                          # NotFoundException, ConflictException, UnauthorizedException, ForbiddenException
+├── Extensions/
+│   └── ClaimsPrincipalExtensions.cs     # GetUserId() — čte sub claim z JWT
+├── Features/                            # CQRS handlery (MediatR)
+│   ├── Auth/                            # RegisterCommand, LoginCommand, LogoutCommand, RefreshCommand
+│   ├── EagleFeathers/                   # UpdateOrCreateEagleFeatherCommand
+│   ├── OrganisationInvites/             # SendOrganisationInviteCommand, GetOrganisationInvitesQuery, AcceptOrganisationInviteCommand, DeclineOrganisationInviteCommand
+│   ├── Organisations/                   # CreateOrganisationCommand, GetOrganisationQuery, UpdateOrganisationCommand, GetOrganisationMembersQuery
+│   └── Users/                           # GetUserQuery, GetCurrentUserQuery, UpdateUserCommand, DeleteUserCommand, LeaveOrganisationCommand
 ├── Middleware/
 │   └── ExceptionHandlerMiddleware.cs
 ├── Migrations/
-├── Models/                         # EF Core entity (User, Organisation, MembershipRequest, EagleFeather, RefreshToken, Gender, UserRole, MembershipRequestStatus, ...)
-├── Requests/                       # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest, CreateOrganisationRequest, UpdateOrganisationRequest, SubmitMembershipRequestRequest
-├── Responses/                      # AuthResponse, EagleFeatherResponse, UserResponse, OrganisationResponse, OrganisationMemberResponse, MembershipRequestResponse
+├── Models/                              # EF Core entity (User, Organisation, OrganisationInvite, EagleFeather, RefreshToken, Gender, UserRole, OrganisationInviteStatus, ...)
+├── OpenApi/
+│   └── BearerSecuritySchemeTransformer.cs  # Přidá JWT Bearer do OpenAPI schématu
+├── Requests/                            # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest, CreateOrganisationRequest, UpdateOrganisationRequest, SendOrganisationInviteRequest
+├── Responses/                           # AuthResponse, EagleFeatherResponse, PublicUserResponse, SelfUserResponse, OrganisationResponse, OrganisationMemberResponse, OrganisationInviteResponse
 ├── Services/
-│   └── SvitekScraper.cs            # Scraper woodcraft.cz (Windows-1250 encoding)
-└── Validators/                     # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator, CreateOrganisationRequestValidator, UpdateOrganisationRequestValidator, SubmitMembershipRequestValidator
+│   ├── RefreshTokenCleanupService.cs    # BackgroundService — denně maže expired/revoked refresh tokeny
+│   └── SvitekScraper.cs                 # Scraper woodcraft.cz (Windows-1250 encoding)
+└── Validators/                          # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator, CreateOrganisationRequestValidator, UpdateOrganisationRequestValidator, SendOrganisationInviteValidator
 
 TrilobitCS.Tests/
-├── ApiCollection.cs                # Sdílí 1 PostgreSQL kontejner napříč testy [Collection("Api")]
+├── ApiCollection.cs                     # Sdílí 1 PostgreSQL kontejner napříč testy [Collection("Api")]
 ├── TrilobitWebApplicationFactory.cs
-├── Auth/                           # RegisterApiTests, LoginApiTests, LogoutApiTests, RefreshApiTests
-├── MembershipRequests/             # SubmitMembershipRequestApiTests, ApproveMembershipRequestApiTests, RejectMembershipRequestApiTests
-├── Organisations/                  # CreateOrganisationApiTests, GetOrganisationApiTests, LeaveOrganisationApiTests
-├── Users/                          # UsersApiTests (GET, PUT, DELETE, Leave Organisation)
-└── Factories/                      # RegisterRequestFactory, UpdateUserRequestFactory, CreateOrganisationRequestFactory, SubmitMembershipRequestRequestFactory (Bogus)
+├── Auth/                                # RegisterApiTests, LoginApiTests, LogoutApiTests, RefreshApiTests
+├── OrganisationInvites/                 # OrganisationInvitesApiTests
+├── Organisations/                       # OrganisationApiTests
+├── Users/                               # UsersApiTests (GET, GET me, PUT, DELETE, Leave Organisation)
+└── Factories/                           # RegisterRequestFactory, UpdateUserRequestFactory, CreateOrganisationRequestFactory
 ```
 
 ---
@@ -205,8 +205,8 @@ Každá operace = Command nebo Query v `Features/<Oblast>/`. Controller pouze de
 ```csharp
 // Controller
 [HttpPost("register")]
-public async Task<IActionResult> Register(RegisterRequest request)
-    => Ok(await _mediator.Send(new RegisterCommand(request)));
+public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
+    => Ok(await _mediator.Send(new RegisterCommand(request), ct));
 
 // Handler v Features/Auth/RegisterCommand.cs
 public record RegisterCommand(RegisterRequest Request) : IRequest<AuthResponse>;
@@ -243,7 +243,7 @@ Response body: `{ "message": "..." }` — zpráva je i18n klíč (např. `"error
 - **Queries** projektují rovnou na response DTO přes `.Select()` — nenačítá se celá entita, do DB jde jen to, co je v response (žádné `password` hashe na drátě):
   ```csharp
   await _db.Users.Where(u => u.Id == id)
-      .Select(u => new UserResponse(u.Id, u.Nickname, ..., u.CreatedAt))
+      .Select(u => new PublicUserResponse(u.Id, u.Nickname, ..., u.CreatedAt))
       .FirstOrDefaultAsync(ct)
       ?? throw new NotFoundException("errors.user_not_found");
   ```
@@ -256,9 +256,11 @@ Response body: `{ "message": "..." }` — zpráva je i18n klíč (např. `"error
 
 Integrační testy přes Testcontainers běží nad reálnou PostgreSQL, takže repozitáře nejsou potřeba ani pro mockování. Vzor: `Features/EagleFeathers/UpdateOrCreateEagleFeatherCommand.cs`.
 
-### Response objekty
+### Response objekty — Privacy model
 
-Každý typ výstupu má dedikovaný record v `Responses/`. Nikdy nevracej EF entity přímo z controlleru — v queries vytvoř response přes `.Select(u => new XxxResponse(...))` v handleru, v commands po `SaveChangesAsync` vrať `new XxxResponse(...)` z namutované entity.
+- `PublicUserResponse` — veřejný profil (bez emailu), vrací `GET /api/users/{id}`
+- `SelfUserResponse` — vlastní profil (s emailem, `role`, `organisationId`), vrací `GET /api/user/me`
+- Ostatní response typy jsou v `Responses/`
 
 ### Testy
 
@@ -268,23 +270,43 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 
 ---
 
+## Architektonická rozhodnutí
+
+### MediatR pin na v12
+
+MediatR 13+ (od srpna 2025) vyžaduje komerční licenci. Projekt je pinnut na `12.4.*` (poslední free verze). **Neupgradovat na 13+ bez rozhodnutí o licenci.** Alternativa: nahradit vlastním minimálním CQRS dispatcherem (~50 řádků).
+
+### JWT token expiration
+
+`appsettings.json` má `AccessTokenExpiresInMinutes: 10080` (7 dní) pro pohodlí při vývoji. **Pro produkci nastavit na 15.** `RefreshTokenExpiresInDays: 365` — pro produkci doporučeno 180.
+
+### Legacy JWT handler
+
+Program.cs používá `JwtSecurityTokenHandler` místo moderního `JsonWebTokenHandler`. Důvod: legacy handler automaticky mapuje `sub` claim na `ClaimTypes.NameIdentifier`. Extension `ClaimsPrincipalExtensions.GetUserId()` na toto mapování spoléhá. Plánovaná migrace: přejít na `JsonWebTokenHandler` + `MapInboundClaims = false` + číst `sub` přímo.
+
+### OpenAPI: Microsoft.AspNetCore.OpenApi + Scalar
+
+Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `/scalar/v1`, OpenAPI dokument na `/openapi/v1.json`. FluentValidation pravidla (max length, required) nejsou automaticky propagovány do OpenAPI schématu — akceptovaný kompromis.
+
+---
+
 ## Existující API endpointy
 
 ### Auth (`/api/auth`)
 
-| Method | Path | Request body | Response | Popis |
-|---|---|---|---|---|
-| POST | `/api/auth/register` | `RegisterRequest` | `AuthResponse` (200) | Registrace nového uživatele |
-| POST | `/api/auth/login` | `LoginRequest` | `AuthResponse` (200) | Přihlášení |
-| POST | `/api/auth/refresh` | `RefreshRequest` | `AuthResponse` (200) | Výměna refresh tokenu (rotation) |
-| POST | `/api/auth/logout` | `RefreshRequest` | 204 No Content | Zneplatnění refresh tokenu |
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/auth/register` | ne | `RegisterRequest` | `AuthResponse` (200) | Registrace nového uživatele |
+| POST | `/api/auth/login` | ne | `LoginRequest` | `AuthResponse` (200) | Přihlášení |
+| POST | `/api/auth/refresh` | ne | `RefreshRequest` | `AuthResponse` (200) | Výměna refresh tokenu (rotation) |
+| POST | `/api/auth/logout` | ne | `RefreshRequest` | 204 No Content | Zneplatnění refresh tokenu |
 
 **RegisterRequest:**
 ```json
 {
-  "nickname": "string (max 20)",
-  "firstName": "string (max 20)",
-  "lastName": "string (max 20)",
+  "nickname": "string (max 20, min 3)",
+  "firstName": "string (max 20, min 3)",
+  "lastName": "string (max 20, min 3)",
   "email": "string (email formát)",
   "password": "string (min 10)",
   "passwordConfirm": "string (musí = password)",
@@ -296,7 +318,7 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 **AuthResponse:**
 ```json
 {
-  "accessToken": "JWT (platný 15 minut)",
+  "accessToken": "JWT (platný 15 minut v prod)",
   "refreshToken": "base64 string (platný 180 dní, single-use — rotation)"
 }
 ```
@@ -307,23 +329,53 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 
 | Method | Path | Auth | Response | Popis |
 |---|---|---|---|---|
-| GET | `/api/eagle-feathers` | ne | `EagleFeatherResponse[]` (200) | Všechna pera |
-| GET | `/api/eagle-feathers/{id}` | ne | `EagleFeatherResponse` (200) | Jedno pero |
+| GET | `/api/eagle-feathers` | **ano** | `EagleFeatherResponse[]` (200) | Všechna pera |
+| GET | `/api/eagle-feathers/{id}` | **ano** | `EagleFeatherResponse` (200) | Jedno pero |
 
 ### Users (`/api/users`, `/api/user`)
 
 | Method | Path | Auth | Request body | Response | Popis |
 |---|---|---|---|---|---|
-| GET | `/api/users/{id}` | ano | — | `UserResponse` (200) | Profil uživatele podle ID |
-| PUT | `/api/user` | ano | `UpdateUserRequest` | `UserResponse` (200) | Aktualizace vlastního profilu |
+| GET | `/api/users/{id}` | ano | — | `PublicUserResponse` (200) | Veřejný profil uživatele (bez emailu) |
+| GET | `/api/user/me` | ano | — | `SelfUserResponse` (200) | Vlastní profil (s emailem, role, organisationId) |
+| PUT | `/api/user` | ano | `UpdateUserRequest` | `SelfUserResponse` (200) | Aktualizace vlastního profilu |
 | DELETE | `/api/user` | ano | — | 204 No Content | Smazání vlastního účtu (včetně refresh tokenů) |
 | DELETE | `/api/user/organisation` | ano | — | 204 No Content | Odchod z organizace (Leader vlastní org blokován) |
+
+**PublicUserResponse:**
+```json
+{
+  "id": 1,
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "profilePicture": null,
+  "createdAt": "2026-04-25T..."
+}
+```
+
+**SelfUserResponse:**
+```json
+{
+  "id": 1,
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "email": "jan@example.com",
+  "gender": "Male",
+  "birthDate": "2000-01-01",
+  "profilePicture": null,
+  "role": "User",
+  "organisationId": null,
+  "createdAt": "2026-04-25T..."
+}
+```
 
 ### Organisations (`/api/organisations`)
 
 | Method | Path | Auth | Request body | Response | Popis |
 |---|---|---|---|---|---|
-| POST | `/api/organisations` | Leader | `CreateOrganisationRequest` | `OrganisationResponse` (200) | Vytvoří org, leader_id = current user, vygeneruje invite_code |
+| POST | `/api/organisations` | Leader | `CreateOrganisationRequest` | `OrganisationResponse` (200) | Vytvoří org, leader_id = current user |
 | GET | `/api/organisations/{id}` | ano | — | `OrganisationResponse` (200) | Detail organizace s počtem členů |
 | PUT | `/api/organisations/{id}` | Leader dané org | `UpdateOrganisationRequest` | `OrganisationResponse` (200) | Aktualizace org (jen vlastní org) |
 | GET | `/api/organisations/{id}/members` | ano | — | `OrganisationMemberResponse[]` (200) | Seznam členů organizace |
@@ -342,8 +394,7 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
 {
   "name": "string (max 100)",
   "description": "string (max 1000)",
-  "avatarUrl": "string (max 255)",
-  "inviteCode": "string (max 20)"
+  "avatarUrl": "string (max 255)"
 }
 ```
 
@@ -354,53 +405,46 @@ Factory pro request data: `Factories/<Model>RequestFactory.cs` s Bogus generáto
   "name": "Skautský oddíl Liška",
   "description": "...",
   "avatarUrl": null,
-  "inviteCode": "AB12CD34",
   "memberCount": 5,
   "leader": { "id": 1, "nickname": "vedouci123" },
   "createdAt": "2026-04-25T..."
 }
 ```
 
-### Membership Requests (`/api/membership-requests`)
+### Organisation Invites (`/api/organisation-invites`)
 
 | Method | Path | Auth | Request body | Response | Popis |
 |---|---|---|---|---|---|
-| POST | `/api/membership-requests` | ano | `SubmitMembershipRequestRequest` | `MembershipRequestResponse` (200) | Podá žádost o členství (přes invite_code) |
-| GET | `/api/membership-requests` | Leader | — | `MembershipRequestResponse[]` (200) | Pending žádosti do leaderovy org |
-| POST | `/api/membership-requests/{id}/approve` | Leader | — | `MembershipRequestResponse` (200) | Schválí žádost, nastaví user.organisation_id, auto-rejectuje ostatní pending žádosti uživatele |
-| POST | `/api/membership-requests/{id}/reject` | Leader | — | `MembershipRequestResponse` (200) | Zamítne žádost |
+| POST | `/api/organisation-invites` | Leader s org | `SendOrganisationInviteRequest` | `OrganisationInviteResponse` (200) | Pošle pozvánku uživateli (podle nickname) |
+| GET | `/api/organisation-invites` | ano | — | `OrganisationInviteResponse[]` (200) | Moje pozvánky (všechny statusy) |
+| POST | `/api/organisation-invites/{id}/accept` | pozvaný user | — | `OrganisationInviteResponse` (200) | Přijme pozvánku, nastaví user.organisation_id |
+| POST | `/api/organisation-invites/{id}/decline` | pozvaný user | — | `OrganisationInviteResponse` (200) | Odmítne pozvánku |
 
-**SubmitMembershipRequestRequest:**
+**SendOrganisationInviteRequest:**
 ```json
-{ "inviteCode": "AB12CD34" }
+{ "nickname": "cil_uzivatele" }
 ```
 
-**MembershipRequestResponse:**
+**OrganisationInviteResponse:**
 ```json
 {
   "id": 1,
-  "userId": 5,
-  "nickname": "novacek99",
   "organisationId": 2,
+  "invitedUserId": 5,
+  "invitedUserNickname": "novacek99",
+  "invitedById": 3,
   "status": 0,
   "createdAt": "2026-04-25T..."
 }
 ```
-Status: `0` = Pending, `1` = Approved, `2` = Rejected
-
-**Business rules:**
-- Submit blokován pokud `user.organisation_id != null` → 422
-- Neplatný invite_code → 404
-- Duplicitní pending na stejnou org → 422
-- Approve: atomicky nastaví `user.organisation_id`, auto-rejectuje ostatní pending žádosti uživatele
-- Approve/Reject blokován pokud request není Pending → 422
+Status: `0` = Pending, `1` = Accepted, `2` = Declined
 
 ---
 
 ## Databázové schéma (kompletní)
 
 ```
--- HOTOVO V DATABÁZI
+-- IMPLEMENTOVÁNO (API existuje)
 users
   id              PK
   nickname        varchar(50)  UNIQUE NOT NULL
@@ -442,21 +486,19 @@ organisations
   name        varchar(100) NOT NULL
   description text
   avatar_url  varchar(255)
-  invite_code varchar(20)  UNIQUE              -- auto-generovaný 8-char kód při vytvoření org
   leader_id   int          NOT NULL FK → users.id (Restrict on delete)
   created_at  timestamp    DEFAULT now()
 
-membership_requests
+organisation_invites
   id              PK
-  user_id         FK → users.id (Cascade delete)
   organisation_id FK → organisations.id (Cascade delete)
-  status          int          DEFAULT 0       -- enum: 0=Pending, 1=Approved, 2=Rejected
-  reviewed_by     FK → users.id (nullable, SetNull on delete)
-  reviewed_at     timestamp    (nullable)
+  invited_user_id FK → users.id (Cascade delete)
+  invited_by_id   FK → users.id (nullable, SetNull on delete)
+  status          int          DEFAULT 0       -- enum: 0=Pending, 1=Accepted, 2=Declined
   created_at      timestamp    DEFAULT now()
-  UNIQUE(user_id, organisation_id) WHERE status = 0  -- partial index: jen jedna pending žádost na (user, org)
+  UNIQUE(invited_user_id, organisation_id) WHERE status = 0  -- partial index: jen jedna pending pozvánka na (user, org)
 
--- ZATÍM NEIMPLEMENTOVÁNO (modely v DB existují, žádné API)
+-- MODELY EXISTUJÍ, API ZATÍM NEIMPLEMENTOVÁNO
 followers
   id            PK
   follower_id   FK → users.id
@@ -526,6 +568,30 @@ challenge_completions
   completed_at timestamp
   UNIQUE(user_id, challenge_id)
 ```
+
+---
+
+## Cross-cutting infrastruktura
+
+### CORS
+Allowed origins se čtou z `appsettings.json` (`Cors:AllowedOrigins`). Politika povoluje libovolné hlavičky a metody pro nakonfigurované origins. Pro produkci nastavit na skutečnou doménu frontendu.
+
+### Rate limiting
+.NET 9 built-in `AddRateLimiter`. Fixed window: **5 requestů / 1 minuta na IP** pro:
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+
+Označení `[EnableRateLimiting("auth")]` na akcích. V testovacím prostředí (`IsEnvironment("Testing")`) je rate limiter vypnutý.
+
+### Refresh token cleanup
+`Services/RefreshTokenCleanupService.cs` jako `BackgroundService`. Spouští se každých 24 hodin a maže:
+```sql
+DELETE FROM refresh_tokens WHERE expires_at < now()
+   OR (revoked_at IS NOT NULL AND revoked_at < now() - INTERVAL '30 days')
+```
+
+### Structured logging (Serilog)
+`Serilog.AspNetCore` s konfigurací z `appsettings.json`. Request logging middleware zaznamenává každý HTTP request. Výchozí sink: console (JSON formát).
 
 ---
 
