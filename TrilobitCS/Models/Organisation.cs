@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\Organisation
 public class Organisation
 {
     public int Id { get; set; }

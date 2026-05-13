@@ -7,7 +7,6 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Auth;
 
-// Laravel: JWTAuth::fromUser($user)
 public class JwtTokenService
 {
     private readonly IConfiguration _configuration;
@@ -17,7 +16,6 @@ public class JwtTokenService
         _configuration = configuration;
     }
 
-    // Krátký access token (15 minut)
     public string GenerateAccessToken(User user)
     {
         var claims = new[]
@@ -46,7 +44,6 @@ public class JwtTokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    // Dlouhý refresh token uložený v DB (180 dní)
     public RefreshToken GenerateRefreshToken(User user)
     {
         var expiresInDays = int.Parse(_configuration["Jwt:RefreshTokenExpiresInDays"] ?? "180");

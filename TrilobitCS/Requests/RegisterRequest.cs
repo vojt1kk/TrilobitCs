@@ -2,7 +2,6 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Requests;
 
-// Laravel: App\Http\Requests\RegisterRequest
 public record RegisterRequest(
     string Nickname,
     string FirstName,

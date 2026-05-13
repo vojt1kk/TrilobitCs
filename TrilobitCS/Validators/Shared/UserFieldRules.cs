@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace TrilobitCS.Validators.Shared;
 
-// Sdílená validační pravidla pro uživatelská pole — použij Include() ve validátorech.
+// Shared validation rules for user fields — apply via Include() in validators.
 public static class UserFieldRules
 {
     public static IRuleBuilderOptions<T, string> NicknameRules<T>(this IRuleBuilder<T, string> rule)

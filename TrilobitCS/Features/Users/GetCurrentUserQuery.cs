@@ -8,7 +8,6 @@ namespace TrilobitCS.Features.Users;
 
 public record GetCurrentUserQuery(int UserId) : IRequest<UserMeResponse>;
 
-// Laravel: UserController@me
 public class GetCurrentUserHandler : IRequestHandler<GetCurrentUserQuery, UserMeResponse>
 {
     private readonly AppDbContext _db;

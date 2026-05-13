@@ -10,7 +10,6 @@ namespace TrilobitCS.Features.Auth;
 
 public record LoginCommand(LoginRequest Request) : IRequest<AuthResponse>;
 
-// Laravel: AuthController@login
 public class LoginHandler : IRequestHandler<LoginCommand, AuthResponse>
 {
     private readonly AppDbContext _db;

@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\Like (morphTo likeable)
 public class Like
 {
     public int Id { get; set; }

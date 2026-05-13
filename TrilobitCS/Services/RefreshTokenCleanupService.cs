@@ -3,7 +3,6 @@ using TrilobitCS.Data;
 
 namespace TrilobitCS.Services;
 
-// Denně maže expired nebo dlouho revokované refresh tokeny.
 public class RefreshTokenCleanupService(IServiceScopeFactory scopeFactory, ILogger<RefreshTokenCleanupService> logger)
     : BackgroundService
 {

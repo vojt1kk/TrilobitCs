@@ -4,7 +4,6 @@ using TrilobitCS.Requests;
 
 namespace TrilobitCS.Tests.Factories;
 
-// Laravel ekvivalent: UserFactory pro update scénáře
 public static class UpdateUserRequestFactory
 {
     private static readonly Faker _faker = new();

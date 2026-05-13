@@ -7,7 +7,6 @@ namespace TrilobitCS.Features.Users;
 
 public record LeaveOrganisationCommand(int UserId) : IRequest;
 
-// Laravel: OrganisationController@leave
 public class LeaveOrganisationHandler : IRequestHandler<LeaveOrganisationCommand>
 {
     private readonly AppDbContext _db;

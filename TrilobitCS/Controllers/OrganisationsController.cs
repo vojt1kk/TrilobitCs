@@ -19,12 +19,11 @@ public class OrganisationsController : ControllerBase
         _mediator = mediator;
     }
 
-    // POST /api/organisations
-    /// <summary>Vytvoří organizaci (pouze Leader)</summary>
-    /// <response code="200">Vytvořená organizace</response>
-    /// <response code="401">Nepřihlášený uživatel</response>
-    /// <response code="403">Uživatel není Leader</response>
-    /// <response code="422">Leader již má organizaci nebo nevalidní data</response>
+    /// <summary>Create an organisation (Leader only)</summary>
+    /// <response code="200">Created organisation</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">User is not a Leader</response>
+    /// <response code="422">Leader already has an organisation or invalid data</response>
     [HttpPost("api/organisations")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
@@ -33,11 +32,10 @@ public class OrganisationsController : ControllerBase
     public async Task<IActionResult> Create(CreateOrganisationRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new CreateOrganisationCommand(User.GetUserId(), request), ct));
 
-    // GET /api/organisations/{id}
-    /// <summary>Vrátí detail organizace</summary>
-    /// <response code="200">Detail organizace</response>
-    /// <response code="401">Nepřihlášený uživatel</response>
-    /// <response code="404">Organizace nenalezena</response>
+    /// <summary>Returns organisation details</summary>
+    /// <response code="200">Organisation details</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Organisation not found</response>
     [HttpGet("api/organisations/{id:int}")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
@@ -45,13 +43,12 @@ public class OrganisationsController : ControllerBase
     public async Task<IActionResult> Show(int id, CancellationToken ct)
         => Ok(await _mediator.Send(new GetOrganisationQuery(id), ct));
 
-    // PUT /api/organisations/{id}
-    /// <summary>Aktualizuje organizaci (pouze Leader dané org)</summary>
-    /// <response code="200">Aktualizovaná organizace</response>
-    /// <response code="401">Nepřihlášený uživatel</response>
-    /// <response code="403">Uživatel není Leader této organizace</response>
-    /// <response code="404">Organizace nenalezena</response>
-    /// <response code="422">Nevalidní data</response>
+    /// <summary>Update an organisation (leader of that organisation only)</summary>
+    /// <response code="200">Updated organisation</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">User is not the leader of this organisation</response>
+    /// <response code="404">Organisation not found</response>
+    /// <response code="422">Invalid data</response>
     [HttpPut("api/organisations/{id:int}")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
@@ -61,11 +58,10 @@ public class OrganisationsController : ControllerBase
     public async Task<IActionResult> Update(int id, UpdateOrganisationRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new UpdateOrganisationCommand(User.GetUserId(), id, request), ct));
 
-    // GET /api/organisations/{id}/members
-    /// <summary>Vrátí seznam členů organizace</summary>
-    /// <response code="200">Seznam členů</response>
-    /// <response code="401">Nepřihlášený uživatel</response>
-    /// <response code="404">Organizace nenalezena</response>
+    /// <summary>Returns the list of organisation members</summary>
+    /// <response code="200">Member list</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Organisation not found</response>
     [HttpGet("api/organisations/{id:int}/members")]
     [ProducesResponseType(typeof(IEnumerable<OrganisationMemberResponse>), 200)]
     [ProducesResponseType(401)]

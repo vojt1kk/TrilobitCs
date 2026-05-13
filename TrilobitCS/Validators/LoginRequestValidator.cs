@@ -3,7 +3,6 @@ using TrilobitCS.Requests;
 
 namespace TrilobitCS.Validators;
 
-// Laravel: App\Http\Requests\LoginRequest::rules()
 public class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()

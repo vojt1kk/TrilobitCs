@@ -4,7 +4,7 @@ using Microsoft.OpenApi.Models;
 
 namespace TrilobitCS.OpenApi;
 
-// Přidá JWT Bearer security scheme do OpenAPI dokumentu a označí všechny operace jako secured.
+// Adds JWT Bearer security scheme to the OpenAPI document and marks all operations as secured.
 internal sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvider authenticationSchemeProvider)
     : IOpenApiDocumentTransformer
 {

@@ -2,7 +2,6 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Requests;
 
-// Laravel: App\Http\Requests\UpdateUserRequest
 public record UpdateUserRequest(
     string Nickname,
     string FirstName,

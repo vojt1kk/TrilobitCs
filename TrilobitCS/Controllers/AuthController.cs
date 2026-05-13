@@ -18,7 +18,6 @@ public class AuthController : ControllerBase
         _mediator = mediator;
     }
 
-    // POST /api/auth/register
     /// <summary>Register a new user</summary>
     /// <response code="200">Returns access token and refresh token</response>
     /// <response code="422">Invalid data (password mismatch, duplicate email/nickname)</response>
@@ -28,7 +27,6 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new RegisterCommand(request), ct));
 
-    // POST /api/auth/login
     /// <summary>Log in with nickname and password</summary>
     /// <response code="200">Returns access token and refresh token</response>
     /// <response code="401">Invalid credentials</response>
@@ -40,7 +38,6 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new LoginCommand(request), ct));
 
-    // POST /api/auth/refresh
     /// <summary>Exchange a refresh token for a new token pair (rotation)</summary>
     /// <response code="200">Returns new access token and refresh token</response>
     /// <response code="401">Invalid or already used refresh token</response>
@@ -52,7 +49,6 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Refresh(RefreshRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new RefreshCommand(request), ct));
 
-    // POST /api/auth/logout
     /// <summary>Log out — revoke the refresh token</summary>
     /// <response code="204">Token successfully revoked</response>
     /// <response code="404">Token not found</response>

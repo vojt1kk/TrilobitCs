@@ -1,6 +1,5 @@
 namespace TrilobitCS.Responses;
 
-// Laravel: UserResource — veřejný profil (bez emailu)
 public record PublicUserResponse(
     int Id,
     string Nickname,

@@ -8,7 +8,6 @@ namespace TrilobitCS.Features.Users;
 
 public record GetUserQuery(int UserId) : IRequest<PublicUserResponse>;
 
-// Laravel: UserController@show
 public class GetUserHandler : IRequestHandler<GetUserQuery, PublicUserResponse>
 {
     private readonly AppDbContext _db;

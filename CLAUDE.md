@@ -2,7 +2,7 @@
 
 ## O projektu
 
-**TrilobitCS** je ASP.NET Core 9 Web API backend sociální sítě primárně pro děti ve skautském/woodcraft prostředí. Projekt je **port existující Laravel PHP aplikace do C#** — komentáře v kódu obsahují Laravel ekvivalenty (např. `// Laravel: AuthController@register`) a musí být zachovány při dalším vývoji.
+**TrilobitCS** je ASP.NET Core 9 Web API backend sociální sítě primárně pro děti ve skautském/woodcraft prostředí. Projekt je **port existující Laravel PHP aplikace do C#**. Komentáře v kódu jsou psány v angličtině; Laravel reference se **nevkládají** — existující komentáře zachovávají jen netriviální invarianty (polymorfní relace, workaroundy, skryté constraints), nikoli triviální přejmenování tříd/metod.
 
 Veškerý obsah je dostupný pouze přihlášeným uživatelům — žádné veřejné endpointy mimo auth.
 

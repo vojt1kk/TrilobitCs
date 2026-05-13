@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\Post
 public class Post
 {
     public int Id { get; set; }

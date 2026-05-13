@@ -3,7 +3,6 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Data;
 
-// Laravel: Database\Migrations
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
@@ -171,7 +170,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<OrganisationInvite>(entity =>
         {
-            // Partial unique index: jedna pending pozvánka na (invited_user, org)
+            // Partial unique index: one pending invite per (user, organisation) pair.
             entity.HasIndex(i => new { i.InvitedUserId, i.OrganisationId })
                 .IsUnique()
                 .HasFilter("\"Status\" = 0");

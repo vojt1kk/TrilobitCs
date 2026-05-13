@@ -1,6 +1,6 @@
 namespace TrilobitCS.Models;
 
-// Laravel: morphTo target ('posts' | 'comments')
+// Discriminator for the polymorphic comment relation (posts | comments).
 public enum CommentableType
 {
     Posts,

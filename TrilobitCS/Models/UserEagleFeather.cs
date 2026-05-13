@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: pivot user_eagle_feathers (workflow ziskani pera)
 public class UserEagleFeather
 {
     public int Id { get; set; }

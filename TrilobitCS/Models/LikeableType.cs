@@ -1,6 +1,6 @@
 namespace TrilobitCS.Models;
 
-// Laravel: morphTo target ('posts' | 'comments')
+// Discriminator for the polymorphic like relation (posts | comments).
 public enum LikeableType
 {
     Posts,

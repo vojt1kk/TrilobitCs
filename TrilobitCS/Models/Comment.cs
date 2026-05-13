@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\Comment (morphTo commentable)
 public class Comment
 {
     public int Id { get; set; }

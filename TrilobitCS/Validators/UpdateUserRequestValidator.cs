@@ -4,7 +4,6 @@ using TrilobitCS.Validators.Shared;
 
 namespace TrilobitCS.Validators;
 
-// Laravel: App\Http\Requests\UpdateUserRequest::rules()
 public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 {
     public UpdateUserRequestValidator()

@@ -10,7 +10,6 @@ namespace TrilobitCS.Features.Organisations;
 
 public record CreateOrganisationCommand(int UserId, CreateOrganisationRequest Request) : IRequest<OrganisationResponse>;
 
-// Laravel: OrganisationController@store
 public class CreateOrganisationHandler : IRequestHandler<CreateOrganisationCommand, OrganisationResponse>
 {
     private readonly AppDbContext _db;

@@ -9,7 +9,6 @@ namespace TrilobitCS.Features.Users;
 
 public record UpdateUserCommand(int UserId, UpdateUserRequest Request) : IRequest<UserMeResponse>;
 
-// Laravel: UserController@update
 public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserMeResponse>
 {
     private readonly AppDbContext _db;

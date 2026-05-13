@@ -34,7 +34,7 @@ public class AcceptOrganisationInviteHandler : IRequestHandler<AcceptOrganisatio
         invite.Status = OrganisationInviteStatus.Accepted;
         invite.InvitedUser.OrganisationId = invite.OrganisationId;
 
-        // Auto-decline ostatní pending pozvánky tohoto uživatele
+        // Auto-decline all other pending invites for this user.
         await _db.OrganisationInvites
             .Where(i => i.InvitedUserId == command.UserId
                         && i.Id != command.InviteId

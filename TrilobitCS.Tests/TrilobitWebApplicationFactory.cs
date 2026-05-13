@@ -9,7 +9,7 @@ using Xunit;
 
 namespace TrilobitCS.Tests;
 
-// Laravel ekvivalent: RefreshDatabase trait — každá testovací třída dostane čistou DB
+// Fresh database per test class (Testcontainers PostgreSQL).
 public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
@@ -42,9 +42,7 @@ public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAs
 
         builder.ConfigureServices(services =>
         {
-            // Odstraní DbContext registrovaný v Program.cs (s dev connection stringem)
-            // a nahradí ho testovacím PostgreSQL kontejnerem (Testcontainers)
-            // Laravel ekvivalent: výměna DB spojení přes RefreshDatabase trait
+            // Replace the DbContext registered in Program.cs with the Testcontainers PostgreSQL instance.
             var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
             if (descriptor != null) services.Remove(descriptor);
 

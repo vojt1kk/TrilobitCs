@@ -2,7 +2,6 @@ using TrilobitCS.Models;
 
 namespace TrilobitCS.Responses;
 
-// Laravel: UserResource — vlastní profil (s emailem, role, organisationId)
 public record UserMeResponse(
     int Id,
     string Nickname,

@@ -10,8 +10,8 @@ namespace TrilobitCS.Features.Auth;
 
 public record RefreshCommand(RefreshRequest Request) : IRequest<AuthResponse>;
 
-// Vymění platný refresh token za nový access token + nový refresh token
-// (rotation — každý refresh token lze použít jen jednou)
+// Exchanges a valid refresh token for a new access token + new refresh token.
+// Rotation: each refresh token is single-use.
 public class RefreshHandler : IRequestHandler<RefreshCommand, AuthResponse>
 {
     private readonly AppDbContext _db;
@@ -32,7 +32,6 @@ public class RefreshHandler : IRequestHandler<RefreshCommand, AuthResponse>
         if (token == null || !token.IsValid)
             throw new UnauthorizedException("errors.invalid_refresh_token");
 
-        // Rotation — starý token zneplatni, vygeneruj nový
         token.RevokedAt = DateTime.UtcNow;
 
         var newRefreshToken = _jwtTokenService.GenerateRefreshToken(token.User);

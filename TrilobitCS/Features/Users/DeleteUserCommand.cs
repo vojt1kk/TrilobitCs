@@ -7,7 +7,6 @@ namespace TrilobitCS.Features.Users;
 
 public record DeleteUserCommand(int UserId) : IRequest;
 
-// Laravel: UserController@destroy
 public class DeleteUserHandler : IRequestHandler<DeleteUserCommand>
 {
     private readonly AppDbContext _db;
@@ -22,7 +21,7 @@ public class DeleteUserHandler : IRequestHandler<DeleteUserCommand>
         var user = await _db.Users.FindAsync([command.UserId], cancellationToken)
             ?? throw new NotFoundException("errors.user_not_found");
 
-        // Smazání refresh tokenů před uživatelem (FK constraint bez cascade delete)
+        // Delete refresh tokens first — no cascade delete on this FK.
         await _db.RefreshTokens
             .Where(t => t.UserId == user.Id)
             .ExecuteDeleteAsync(cancellationToken);

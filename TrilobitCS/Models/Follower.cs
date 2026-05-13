@@ -1,6 +1,6 @@
 namespace TrilobitCS.Models;
 
-// Laravel: pivot 'followers' (one-way follow)
+// One-way follow: follower tracks following, no mutual acceptance required.
 public class Follower
 {
     public int Id { get; set; }

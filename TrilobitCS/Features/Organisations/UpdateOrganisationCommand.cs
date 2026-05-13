@@ -9,7 +9,6 @@ namespace TrilobitCS.Features.Organisations;
 
 public record UpdateOrganisationCommand(int UserId, int OrganisationId, UpdateOrganisationRequest Request) : IRequest<OrganisationResponse>;
 
-// Laravel: OrganisationController@update
 public class UpdateOrganisationHandler : IRequestHandler<UpdateOrganisationCommand, OrganisationResponse>
 {
     private readonly AppDbContext _db;

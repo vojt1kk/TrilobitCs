@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\Challenge
 public class Challenge
 {
     public int Id { get; set; }

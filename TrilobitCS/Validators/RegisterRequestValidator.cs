@@ -4,7 +4,6 @@ using TrilobitCS.Validators.Shared;
 
 namespace TrilobitCS.Validators;
 
-// Laravel: App\Http\Requests\RegisterRequest::rules()
 public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
     public RegisterRequestValidator()
@@ -22,7 +21,6 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
             .NotEmpty()
             .MinimumLength(10);
 
-        // Laravel: 'password' => ['confirmed']
         RuleFor(x => x.PasswordConfirm)
             .Equal(x => x.Password)
             .WithMessage("'Password Confirm' must match 'Password'.");

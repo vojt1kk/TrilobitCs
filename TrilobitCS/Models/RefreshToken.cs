@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: personal_access_tokens tabulka (Sanctum)
 public class RefreshToken
 {
     public int Id { get; set; }

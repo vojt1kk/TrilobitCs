@@ -2,6 +2,6 @@ using Xunit;
 
 namespace TrilobitCS.Tests;
 
-// Sdílí jeden PostgreSQL kontejner napříč všemi testovacími třídami
+// Shares one PostgreSQL container across all test classes.
 [CollectionDefinition("Api")]
 public class ApiCollection : ICollectionFixture<TrilobitWebApplicationFactory> { }

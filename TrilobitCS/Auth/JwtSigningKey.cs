@@ -1,8 +1,8 @@
 namespace TrilobitCS.Auth;
 
-// Sdílený identifikátor podepisovacího klíče — vkládáme ho do JWT headeru ('kid')
-// i do validačního klíče v Program.cs. Microsoft.IdentityModel (8+) striktně kontroluje
-// shodu 'kid' tokenu s 'KeyId' validačního klíče.
+// Shared signing key identifier — embedded in the JWT header ('kid') and in the
+// validation key in Program.cs. Microsoft.IdentityModel 8+ strictly enforces that
+// the token's 'kid' matches the validation key's KeyId.
 internal static class JwtSigningKey
 {
     public const string KeyId = "trilobit-default";

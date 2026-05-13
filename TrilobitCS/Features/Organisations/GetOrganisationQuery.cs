@@ -8,7 +8,6 @@ namespace TrilobitCS.Features.Organisations;
 
 public record GetOrganisationQuery(int OrganisationId) : IRequest<OrganisationResponse>;
 
-// Laravel: OrganisationController@show
 public class GetOrganisationHandler : IRequestHandler<GetOrganisationQuery, OrganisationResponse>
 {
     private readonly AppDbContext _db;

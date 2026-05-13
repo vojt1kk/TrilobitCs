@@ -1,6 +1,5 @@
 namespace TrilobitCS.Models;
 
-// Laravel: App\Models\User
 public class User
 {
     public int Id { get; set; }
@@ -17,7 +16,6 @@ public class User
     public Organisation? Organisation { get; set; }
     public DateTime CreatedAt { get; set; }
 
-    // Laravel: hasMany relationships
     public ICollection<Follower> Following { get; set; } = new List<Follower>();
     public ICollection<Follower> Followers { get; set; } = new List<Follower>();
     public ICollection<UserEagleFeather> EagleFeathers { get; set; } = new List<UserEagleFeather>();

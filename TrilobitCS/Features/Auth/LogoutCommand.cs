@@ -8,7 +8,6 @@ namespace TrilobitCS.Features.Auth;
 
 public record LogoutCommand(RefreshRequest Request) : IRequest;
 
-// Laravel: Auth::logout() — zneplatní token konkrétního zařízení
 public class LogoutHandler : IRequestHandler<LogoutCommand>
 {
     private readonly AppDbContext _db;

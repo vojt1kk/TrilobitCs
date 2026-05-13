@@ -18,7 +18,6 @@ public class ExceptionHandlerMiddleware
         {
             await _next(context);
         }
-        // Laravel: AuthenticationException → abort(401)
         catch (UnauthorizedException ex)
         {
             context.Response.StatusCode = 401;
