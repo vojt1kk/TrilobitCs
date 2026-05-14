@@ -35,7 +35,7 @@ public class ScrapeEagleFeathersCommand
                 foreach (var activity in activities)
                 {
                     await _mediator.Send(new UpdateOrCreateEagleFeatherCommand(
-                        (byte)light, sectionName, (short)activity.Number,
+                        (byte)light, sectionCode, (short)activity.Number,
                         activity.Name,
                         _scraper.StripHtml(activity.Challenge),
                         _scraper.StripHtml(activity.GrandChallenge),

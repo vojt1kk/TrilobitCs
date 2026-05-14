@@ -24,4 +24,8 @@
         <ProjectReference Include="..\TrilobitCS\TrilobitCS.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="EagleFeathers\Fixtures\*.html" />
+    </ItemGroup>
+
 </Project>

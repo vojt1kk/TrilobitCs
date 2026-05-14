@@ -169,6 +169,93 @@ public class OrganisationApiTests
     }
 
     // =====================
+    // PUT /api/organisations/{id}
+    // =====================
+
+    [Fact]
+    public async Task UpdateOrganisation_AsLeader_Returns200WithUpdatedName()
+    {
+        var (accessToken, orgId) = await CreateOrganisationAsLeader();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.PutAsJsonAsync($"/api/organisations/{orgId}", new { name = "Updated Name" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("id").GetInt32().Should().Be(orgId);
+        body.GetProperty("name").GetString().Should().Be("Updated Name");
+    }
+
+    [Fact]
+    public async Task UpdateOrganisation_WithDescriptionAndAvatarUrl_Returns200()
+    {
+        var (accessToken, orgId) = await CreateOrganisationAsLeader();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.PutAsJsonAsync($"/api/organisations/{orgId}", new
+        {
+            name = "Updated Name",
+            description = "A new description",
+            avatarUrl = "https://example.com/avatar.png"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("name").GetString().Should().Be("Updated Name");
+        body.GetProperty("description").GetString().Should().Be("A new description");
+        body.GetProperty("avatarUrl").GetString().Should().Be("https://example.com/avatar.png");
+    }
+
+    [Fact]
+    public async Task UpdateOrganisation_AsRegularUser_Returns403()
+    {
+        var (_, orgId) = await CreateOrganisationAsLeader();
+        var regularUserToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", regularUserToken);
+
+        var response = await _client.PutAsJsonAsync($"/api/organisations/{orgId}", new { name = "Hacked Name" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task UpdateOrganisation_LeaderOfDifferentOrg_Returns403()
+    {
+        var (_, orgId) = await CreateOrganisationAsLeader();
+        var otherLeaderToken = await RegisterLeaderAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherLeaderToken);
+        await _client.PostAsJsonAsync("/api/organisations", CreateOrganisationRequestFactory.Make());
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherLeaderToken);
+        var response = await _client.PutAsJsonAsync($"/api/organisations/{orgId}", new { name = "Hacked Name" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("message").GetString().Should().Be("errors.not_organisation_leader");
+    }
+
+    [Fact]
+    public async Task UpdateOrganisation_NotFound_Returns404()
+    {
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.PutAsJsonAsync("/api/organisations/999999", new { name = "Whatever" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("message").GetString().Should().Be("errors.organisation_not_found");
+    }
+
+    [Fact]
+    public async Task UpdateOrganisation_Unauthenticated_Returns401()
+    {
+        var response = await _client.PutAsJsonAsync("/api/organisations/1", new { name = "Whatever" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // =====================
     // DELETE /api/user/organisation
     // =====================
 
