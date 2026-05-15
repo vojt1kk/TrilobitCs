@@ -13,16 +13,9 @@ using Xunit;
 namespace TrilobitCS.Tests.Users;
 
 [Collection("Api")]
-public class UsersApiTests
+public class UsersApiTests : ApiTestBase
 {
-    private readonly TrilobitWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public UsersApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
+    public UsersApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     // GET /api/users/{id}
 
@@ -202,13 +195,6 @@ public class UsersApiTests
         var response = await _client.DeleteAsync("/api/user");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    private async Task<string> RegisterAndGetToken(RegisterRequest? request = null)
-    {
-        var response = await _client.PostAsJsonAsync("/api/auth/register", request ?? RegisterRequestFactory.Make());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accessToken").GetString()!;
     }
 
     private static int ExtractUserIdFromJwt(string jwt)

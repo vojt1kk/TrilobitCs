@@ -8,14 +8,9 @@ using Xunit;
 namespace TrilobitCS.Tests.Auth;
 
 [Collection("Api")]
-public class LogoutApiTests
+public class LogoutApiTests : ApiTestBase
 {
-    private readonly HttpClient _client;
-
-    public LogoutApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _client = factory.CreateClient();
-    }
+    public LogoutApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
     public async Task Logout_ValidToken_Returns204()

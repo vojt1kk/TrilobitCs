@@ -42,5 +42,11 @@ public class ExceptionHandlerMiddleware
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
         }
+        catch (Exception ex)
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
+        }
     }
 }

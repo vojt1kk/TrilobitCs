@@ -8,23 +8,18 @@ using Xunit;
 namespace TrilobitCS.Tests.Auth;
 
 [Collection("Api")]
-public class RefreshApiTests
+public class RefreshApiTests : ApiTestBase
 {
-    private readonly HttpClient _client;
-
-    public RefreshApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _client = factory.CreateClient();
-    }
+    public RefreshApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
-    public async Task Refresh_ValidToken_Returns200()
+    public async Task Refresh_ValidToken_Returns201()
     {
         var refreshToken = await RegisterAndGetRefreshToken();
 
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", new { refreshToken });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("refreshToken").GetString().Should().NotBe(refreshToken);
     }

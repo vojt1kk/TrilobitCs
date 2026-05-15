@@ -14,30 +14,23 @@ using Xunit;
 namespace TrilobitCS.Tests.Organisations;
 
 [Collection("Api")]
-public class OrganisationApiTests
+public class OrganisationApiTests : ApiTestBase
 {
-    private readonly TrilobitWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public OrganisationApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
+    public OrganisationApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     // =====================
     // POST /api/organisations
     // =====================
 
     [Fact]
-    public async Task CreateOrganisation_AsLeader_Returns200()
+    public async Task CreateOrganisation_AsLeader_Returns201()
     {
         var accessToken = await RegisterLeaderAndGetToken();
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await _client.PostAsJsonAsync("/api/organisations", CreateOrganisationRequestFactory.Make());
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("memberCount").GetInt32().Should().Be(1);
     }
@@ -145,7 +138,7 @@ public class OrganisationApiTests
     // =====================
 
     [Fact]
-    public async Task GetOrganisationMembers_Returns200WithMemberList()
+    public async Task GetOrganisationMembers_Returns200WithPagedResponse()
     {
         var (accessToken, orgId) = await CreateOrganisationAsLeader();
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -154,7 +147,9 @@ public class OrganisationApiTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetArrayLength().Should().Be(1);
+        body.GetProperty("items").GetArrayLength().Should().Be(1);
+        body.GetProperty("page").GetInt32().Should().Be(1);
+        body.GetProperty("totalCount").GetInt32().Should().Be(1);
     }
 
     [Fact]
@@ -166,6 +161,28 @@ public class OrganisationApiTests
         var response = await _client.GetAsync("/api/organisations/999999/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetOrganisationMembers_InvalidPageSize_Returns422()
+    {
+        var (accessToken, orgId) = await CreateOrganisationAsLeader();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync($"/api/organisations/{orgId}/members?pageSize=200");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task GetOrganisationMembers_InvalidPage_Returns422()
+    {
+        var (accessToken, orgId) = await CreateOrganisationAsLeader();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync($"/api/organisations/{orgId}/members?page=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     // =====================
@@ -310,41 +327,6 @@ public class OrganisationApiTests
     }
 
     // =====================
-    // Helpers
-    // =====================
-
-    private async Task<string> RegisterAndGetToken(RegisterRequest? request = null)
-    {
-        var response = await _client.PostAsJsonAsync("/api/auth/register", request ?? RegisterRequestFactory.Make());
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accessToken").GetString()!;
-    }
-
-    private async Task<string> RegisterLeaderAndGetToken(RegisterRequest? request = null)
-    {
-        var req = request ?? RegisterRequestFactory.Make();
-        var response = await _client.PostAsJsonAsync("/api/auth/register", req);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var accessToken = body.GetProperty("accessToken").GetString()!;
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.FirstAsync(u => u.Email == req.Email);
-        user.Role = UserRole.Leader;
-        await db.SaveChangesAsync();
-
-        return accessToken;
-    }
-
-    private async Task<(string AccessToken, int OrgId)> CreateOrganisationAsLeader()
-    {
-        var accessToken = await RegisterLeaderAndGetToken();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        var orgResponse = await _client.PostAsJsonAsync("/api/organisations", CreateOrganisationRequestFactory.Make());
-        var orgBody = await orgResponse.Content.ReadFromJsonAsync<JsonElement>();
-        return (accessToken, orgBody.GetProperty("id").GetInt32());
-    }
-
     private async Task<(string LeaderToken, string MemberToken, string MemberEmail)> SetupOrgWithMember()
     {
         var (leaderToken, _) = await CreateOrganisationAsLeader();

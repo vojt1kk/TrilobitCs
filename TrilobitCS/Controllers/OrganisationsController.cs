@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TrilobitCS.Extensions;
 using TrilobitCS.Features.Organisations;
+using TrilobitCS.Pagination;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
 
@@ -20,17 +21,17 @@ public class OrganisationsController : ControllerBase
     }
 
     /// <summary>Create an organisation (Leader only)</summary>
-    /// <response code="200">Created organisation</response>
+    /// <response code="201">Created organisation</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="403">User is not a Leader</response>
     /// <response code="422">Leader already has an organisation or invalid data</response>
     [HttpPost("api/organisations")]
-    [ProducesResponseType(typeof(OrganisationResponse), 200)]
+    [ProducesResponseType(typeof(OrganisationResponse), 201)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> Create(CreateOrganisationRequest request, CancellationToken ct)
-        => Ok(await _mediator.Send(new CreateOrganisationCommand(User.GetUserId(), request), ct));
+        => StatusCode(201, await _mediator.Send(new CreateOrganisationCommand(User.GetUserId(), request), ct));
 
     /// <summary>Returns organisation details</summary>
     /// <response code="200">Organisation details</response>
@@ -58,14 +59,16 @@ public class OrganisationsController : ControllerBase
     public async Task<IActionResult> Update(int id, UpdateOrganisationRequest request, CancellationToken ct)
         => Ok(await _mediator.Send(new UpdateOrganisationCommand(User.GetUserId(), id, request), ct));
 
-    /// <summary>Returns the list of organisation members</summary>
+    /// <summary>Returns the list of organisation members (paginated)</summary>
     /// <response code="200">Member list</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Organisation not found</response>
+    /// <response code="422">Invalid pagination parameters</response>
     [HttpGet("api/organisations/{id:int}/members")]
-    [ProducesResponseType(typeof(IEnumerable<OrganisationMemberResponse>), 200)]
+    [ProducesResponseType(typeof(PagedResponse<OrganisationMemberResponse>), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Members(int id, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetOrganisationMembersQuery(id), ct));
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> Members(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOrganisationMembersQuery(id, pagination), ct));
 }

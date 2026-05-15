@@ -8,21 +8,16 @@ using Xunit;
 namespace TrilobitCS.Tests.Auth;
 
 [Collection("Api")]
-public class RegisterApiTests
+public class RegisterApiTests : ApiTestBase
 {
-    private readonly HttpClient _client;
-
-    public RegisterApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _client = factory.CreateClient();
-    }
+    public RegisterApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
-    public async Task Register_ValidRequest_Returns200()
+    public async Task Register_ValidRequest_Returns201()
     {
         var response = await _client.PostAsJsonAsync("/api/auth/register", RegisterRequestFactory.Make());
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("accessToken").GetString().Should().NotBeNullOrEmpty();
         body.GetProperty("refreshToken").GetString().Should().NotBeNullOrEmpty();

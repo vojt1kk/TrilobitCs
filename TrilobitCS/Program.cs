@@ -71,7 +71,8 @@ try
     builder.Services.AddHttpClient<SvitekScraper>();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
     builder.Services.AddScoped<ScrapeEagleFeathersCommand>();
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+        options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true);
 
     builder.Services.AddResponseCompression(options =>
     {
@@ -88,21 +89,33 @@ try
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
-    // Validation errors → 422 instead of the default 400.
+    // Validation errors → 422. Empty body → generic message instead of confusing "request field is required".
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
-            new UnprocessableEntityObjectResult(context.ModelState);
+        {
+            var isEmptyBody = context.ModelState.ContainsKey("") || context.ModelState.ContainsKey("request");
+            var hasOnlyBodyErrors = context.ModelState.Keys.All(k => k is "" or "request");
+
+            if (isEmptyBody && hasOnlyBodyErrors)
+                return new UnprocessableEntityObjectResult(new { message = "errors.empty_body" });
+
+            var errors = context.ModelState
+                .Where(e => e.Key is not "" and not "request")
+                .ToDictionary(e => e.Key, e => e.Value!.Errors.Select(x => x.ErrorMessage));
+
+            return new UnprocessableEntityObjectResult(errors);
+        };
     });
 
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-    builder.Services.AddCors(options =>
-    {
-        options.AddPolicy("Frontend", policy =>
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod());
-    });
+    // var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    // builder.Services.AddCors(options =>
+    // {
+    //     options.AddPolicy("Frontend", policy =>
+    //         policy.WithOrigins(allowedOrigins)
+    //               .AllowAnyHeader()
+    //               .AllowAnyMethod());
+    // });
 
     // Rate limiting for auth endpoints — per-IP, 5 requests per minute, disabled in testing.
     if (!builder.Environment.IsEnvironment("Testing"))
@@ -157,7 +170,7 @@ try
 
     app.UseSerilogRequestLogging();
 
-    app.UseCors("Frontend");
+    // app.UseCors("Frontend");
 
     if (!app.Environment.IsEnvironment("Testing"))
         app.UseRateLimiter();

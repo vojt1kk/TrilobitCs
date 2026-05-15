@@ -1,8 +1,10 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
+using TrilobitCS.Features.EagleFeathers;
+using TrilobitCS.Pagination;
 using TrilobitCS.Responses;
 
 namespace TrilobitCS.Controllers;
@@ -12,24 +14,25 @@ namespace TrilobitCS.Controllers;
 [Route("api/eagle-feathers")]
 public class EagleFeathersController : ControllerBase
 {
+    private readonly IMediator _mediator;
     private readonly AppDbContext _db;
 
-    public EagleFeathersController(AppDbContext db)
+    public EagleFeathersController(IMediator mediator, AppDbContext db)
     {
+        _mediator = mediator;
         _db = db;
     }
 
-    /// <summary>Get all eagle feathers</summary>
-    /// <response code="200">Returns an array of eagle feathers</response>
+    /// <summary>Get all eagle feathers (paginated)</summary>
+    /// <response code="200">Returns a paginated list of eagle feathers</response>
     /// <response code="401">Unauthorized</response>
+    /// <response code="422">Invalid pagination parameters</response>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<EagleFeatherResponse>), 200)]
+    [ProducesResponseType(typeof(PagedResponse<EagleFeatherResponse>), 200)]
     [ProducesResponseType(401)]
-    public async Task<IActionResult> Index(CancellationToken ct)
-    {
-        var feathers = await _db.EagleFeathers.ToListAsync(ct);
-        return Ok(feathers.Select(EagleFeatherResponse.FromModel));
-    }
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> Index([FromQuery] PaginationQuery pagination, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetEagleFeathersQuery(pagination), ct));
 
     /// <summary>Get a single eagle feather by ID</summary>
     /// <param name="id">Eagle feather ID</param>

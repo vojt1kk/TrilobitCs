@@ -8,17 +8,12 @@ using Xunit;
 namespace TrilobitCS.Tests.Auth;
 
 [Collection("Api")]
-public class LoginApiTests
+public class LoginApiTests : ApiTestBase
 {
-    private readonly HttpClient _client;
-
-    public LoginApiTests(TrilobitWebApplicationFactory factory)
-    {
-        _client = factory.CreateClient();
-    }
+    public LoginApiTests(TrilobitWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
-    public async Task Login_ValidCredentials_Returns200()
+    public async Task Login_ValidCredentials_Returns201()
     {
         var request = RegisterRequestFactory.Make();
         await _client.PostAsJsonAsync("/api/auth/register", request);
@@ -29,7 +24,7 @@ public class LoginApiTests
             password = request.Password,
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("accessToken").GetString().Should().NotBeNullOrEmpty();
         body.GetProperty("refreshToken").GetString().Should().NotBeNullOrEmpty();
