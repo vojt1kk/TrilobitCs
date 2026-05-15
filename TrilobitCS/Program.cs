@@ -139,11 +139,13 @@ try
 
     var app = builder.Build();
 
+    Log.Information("Applying database migrations...");
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
     }
+    Log.Information("Migrations applied. Starting server...");
 
     if (args.Contains("scrape"))
     {

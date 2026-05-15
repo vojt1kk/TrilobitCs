@@ -6,4 +6,8 @@ public record PagedResponse<T>(
     int PageSize,
     int TotalCount,
     int TotalPages
-);
+)
+{
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+};

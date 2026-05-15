@@ -26,7 +26,7 @@ public class UsersApiTests : ApiTestBase
 
         var secondUser = RegisterRequestFactory.Make();
         var secondResponse = await _client.PostAsJsonAsync("/api/auth/register", secondUser);
-        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var secondUserId = ExtractUserIdFromJwt(
             (await secondResponse.Content.ReadFromJsonAsync<JsonElement>())
                 .GetProperty("accessToken").GetString()!);

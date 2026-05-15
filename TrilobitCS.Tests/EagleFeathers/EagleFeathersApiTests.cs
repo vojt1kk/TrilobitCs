@@ -89,6 +89,63 @@ public class EagleFeathersApiTests : ApiTestBase
     }
 
     [Fact]
+    public async Task GetEagleFeathers_PageSizeZero_Returns422()
+    {
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers?pageSize=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task GetEagleFeathers_HasNextPage_TrueOnFirstPageWhenMultiplePages()
+    {
+        await SeedEagleFeather();
+        await SeedEagleFeather();
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers?page=1&pageSize=1");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("hasNextPage").GetBoolean().Should().BeTrue();
+        body.GetProperty("hasPreviousPage").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetEagleFeathers_HasPreviousPage_TrueOnPageTwo()
+    {
+        await SeedEagleFeather();
+        await SeedEagleFeather();
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers?page=2&pageSize=1");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("hasPreviousPage").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetEagleFeathers_SinglePage_HasNextAndPreviousFalse()
+    {
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers?page=1&pageSize=100");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("hasPreviousPage").GetBoolean().Should().BeFalse();
+        // pageSize=100 fits all feathers in a test DB → hasNextPage=false
+        body.GetProperty("hasNextPage").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetEagleFeathers_Unauthenticated_Returns401()
     {
         var response = await _client.GetAsync("/api/eagle-feathers");

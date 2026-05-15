@@ -20,33 +20,15 @@ public class GetOrganisationMembersHandler : IRequestHandler<GetOrganisationMemb
 
     public async Task<PagedResponse<OrganisationMemberResponse>> Handle(GetOrganisationMembersQuery query, CancellationToken cancellationToken)
     {
-        var exists = await _db.Organisations.AnyAsync(o => o.Id == query.OrganisationId, cancellationToken);
-        if (!exists)
+        if (!await _db.Organisations.AnyAsync(o => o.Id == query.OrganisationId, cancellationToken))
             throw new NotFoundException("errors.organisation_not_found");
 
-        var baseQuery = _db.Users
+        return await _db.Users
             .Where(u => u.OrganisationId == query.OrganisationId)
-            .OrderBy(u => u.Id);
-
-        var totalCount = await baseQuery.CountAsync(cancellationToken);
-        var items = await baseQuery
-            .Skip((query.Pagination.Page - 1) * query.Pagination.PageSize)
-            .Take(query.Pagination.PageSize)
-            .Select(u => new OrganisationMemberResponse(
-                u.Id,
-                u.Nickname,
-                u.FirstName,
-                u.LastName,
-                u.ProfilePicture,
-                u.Role,
-                u.CreatedAt))
-            .ToListAsync(cancellationToken);
-
-        return new PagedResponse<OrganisationMemberResponse>(
-            items,
-            query.Pagination.Page,
-            query.Pagination.PageSize,
-            totalCount,
-            (int)Math.Ceiling((double)totalCount / query.Pagination.PageSize));
+            .OrderBy(u => u.Id)
+            .ToPagedResponseAsync(
+                query.Pagination,
+                u => new OrganisationMemberResponse(u.Id, u.Nickname, u.FirstName, u.LastName, u.ProfilePicture, u.Role, u.CreatedAt),
+                cancellationToken);
     }
 }

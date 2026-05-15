@@ -17,31 +17,13 @@ public class GetOrganisationInvitesHandler : IRequestHandler<GetOrganisationInvi
         _db = db;
     }
 
-    public async Task<PagedResponse<OrganisationInviteResponse>> Handle(GetOrganisationInvitesQuery query, CancellationToken cancellationToken)
-    {
-        var baseQuery = _db.OrganisationInvites
+    public Task<PagedResponse<OrganisationInviteResponse>> Handle(GetOrganisationInvitesQuery query, CancellationToken cancellationToken)
+        => _db.OrganisationInvites
+            .Include(i => i.InvitedUser)
             .Where(i => i.InvitedUserId == query.UserId)
-            .OrderBy(i => i.Id);
-
-        var totalCount = await baseQuery.CountAsync(cancellationToken);
-        var items = await baseQuery
-            .Skip((query.Pagination.Page - 1) * query.Pagination.PageSize)
-            .Take(query.Pagination.PageSize)
-            .Select(i => new OrganisationInviteResponse(
-                i.Id,
-                i.OrganisationId,
-                i.InvitedUserId,
-                i.InvitedUser.Nickname,
-                i.InvitedById,
-                i.Status,
-                i.CreatedAt))
-            .ToListAsync(cancellationToken);
-
-        return new PagedResponse<OrganisationInviteResponse>(
-            items,
-            query.Pagination.Page,
-            query.Pagination.PageSize,
-            totalCount,
-            (int)Math.Ceiling((double)totalCount / query.Pagination.PageSize));
-    }
+            .OrderBy(i => i.Id)
+            .ToPagedResponseAsync(
+                query.Pagination,
+                i => new OrganisationInviteResponse(i.Id, i.OrganisationId, i.InvitedUserId, i.InvitedUser.Nickname, i.InvitedById, i.Status, i.CreatedAt),
+                cancellationToken);
 }
