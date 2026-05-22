@@ -29,6 +29,7 @@ public class DeclineOrganisationInviteHandler : IRequestHandler<DeclineOrganisat
             throw new ConflictException("errors.invite_not_pending");
 
         invite.Status = OrganisationInviteStatus.Declined;
+        invite.DeclinedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
 
         return new OrganisationInviteResponse(

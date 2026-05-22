@@ -12,15 +12,15 @@ using TrilobitCS.Data;
 namespace TrilobitCS.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260423121003_AddSocialDomain")]
-    partial class AddSocialDomain
+    [Migration("20260515142534_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.15")
+                .HasAnnotation("ProductVersion", "9.0.16")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -42,7 +42,7 @@ namespace TrilobitCS.Migrations
                     b.Property<int?>("DifficultyLevel")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("EagleFeatherId")
+                    b.Property<int>("EagleFeatherId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Title")
@@ -60,39 +60,6 @@ namespace TrilobitCS.Migrations
                     b.HasIndex("EagleFeatherId");
 
                     b.ToTable("Challenges");
-                });
-
-            modelBuilder.Entity("TrilobitCS.Models.ChallengeCompletion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChallengeId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResultUnit")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("ResultValue")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChallengeId");
-
-                    b.HasIndex("UserId", "ChallengeId")
-                        .IsUnique();
-
-                    b.ToTable("ChallengeCompletions");
                 });
 
             modelBuilder.Entity("TrilobitCS.Models.Comment", b =>
@@ -116,20 +83,10 @@ namespace TrilobitCS.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("ParentId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("PostId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("PostId");
 
                     b.HasIndex("UserId");
 
@@ -221,9 +178,6 @@ namespace TrilobitCS.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("CommentId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -233,17 +187,10 @@ namespace TrilobitCS.Migrations
                     b.Property<int>("LikeableType")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("PostId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CommentId");
-
-                    b.HasIndex("PostId");
 
                     b.HasIndex("LikeableType", "LikeableId");
 
@@ -270,9 +217,6 @@ namespace TrilobitCS.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<string>("InviteCode")
-                        .HasColumnType("text");
-
                     b.Property<int>("LeaderId")
                         .HasColumnType("integer");
 
@@ -282,12 +226,50 @@ namespace TrilobitCS.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InviteCode")
-                        .IsUnique();
-
                     b.HasIndex("LeaderId");
 
                     b.ToTable("Organisations");
+                });
+
+            modelBuilder.Entity("TrilobitCS.Models.OrganisationInvite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeclinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("InvitedById")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InvitedUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrganisationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvitedById");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("InvitedUserId", "OrganisationId", "DeclinedAt")
+                        .IsUnique();
+
+                    b.ToTable("OrganisationInvites");
                 });
 
             modelBuilder.Entity("TrilobitCS.Models.Post", b =>
@@ -298,7 +280,7 @@ namespace TrilobitCS.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("ChallengeCompletionId")
+                    b.Property<int?>("ChallengeId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Content")
@@ -307,13 +289,13 @@ namespace TrilobitCS.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("EagleFeatherId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
                     b.Property<int?>("OrganisationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserEagleFeatherId")
                         .HasColumnType("integer");
 
                     b.Property<int>("UserId")
@@ -321,11 +303,11 @@ namespace TrilobitCS.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChallengeCompletionId");
-
-                    b.HasIndex("EagleFeatherId");
+                    b.HasIndex("ChallengeId");
 
                     b.HasIndex("OrganisationId");
+
+                    b.HasIndex("UserEagleFeatherId");
 
                     b.HasIndex("UserId");
 
@@ -422,6 +404,38 @@ namespace TrilobitCS.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("TrilobitCS.Models.UserChallenge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChallengeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PinnedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("UnpinnedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChallengeId");
+
+                    b.HasIndex("UserId", "ChallengeId")
+                        .IsUnique();
+
+                    b.ToTable("UserChallenges");
+                });
+
             modelBuilder.Entity("TrilobitCS.Models.UserEagleFeather", b =>
                 {
                     b.Property<int>("Id")
@@ -438,6 +452,11 @@ namespace TrilobitCS.Migrations
 
                     b.Property<DateTime?>("EarnedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsCompleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsGrandChallenge")
                         .HasColumnType("boolean");
@@ -468,51 +487,19 @@ namespace TrilobitCS.Migrations
                     b.HasOne("TrilobitCS.Models.EagleFeather", "EagleFeather")
                         .WithMany("Challenges")
                         .HasForeignKey("EagleFeatherId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("EagleFeather");
                 });
 
-            modelBuilder.Entity("TrilobitCS.Models.ChallengeCompletion", b =>
-                {
-                    b.HasOne("TrilobitCS.Models.Challenge", "Challenge")
-                        .WithMany("Completions")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TrilobitCS.Models.User", "User")
-                        .WithMany("ChallengeCompletions")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Challenge");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("TrilobitCS.Models.Comment", b =>
                 {
-                    b.HasOne("TrilobitCS.Models.Comment", "Parent")
-                        .WithMany("Replies")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TrilobitCS.Models.Post", "Post")
-                        .WithMany("Comments")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("TrilobitCS.Models.User", "User")
                         .WithMany("Comments")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Parent");
-
-                    b.Navigation("Post");
 
                     b.Navigation("User");
                 });
@@ -538,25 +525,11 @@ namespace TrilobitCS.Migrations
 
             modelBuilder.Entity("TrilobitCS.Models.Like", b =>
                 {
-                    b.HasOne("TrilobitCS.Models.Comment", "Comment")
-                        .WithMany("Likes")
-                        .HasForeignKey("CommentId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("TrilobitCS.Models.Post", "Post")
-                        .WithMany("Likes")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("TrilobitCS.Models.User", "User")
                         .WithMany("Likes")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Comment");
-
-                    b.Navigation("Post");
 
                     b.Navigation("User");
                 });
@@ -572,16 +545,37 @@ namespace TrilobitCS.Migrations
                     b.Navigation("Leader");
                 });
 
-            modelBuilder.Entity("TrilobitCS.Models.Post", b =>
+            modelBuilder.Entity("TrilobitCS.Models.OrganisationInvite", b =>
                 {
-                    b.HasOne("TrilobitCS.Models.ChallengeCompletion", "ChallengeCompletion")
-                        .WithMany("Posts")
-                        .HasForeignKey("ChallengeCompletionId")
+                    b.HasOne("TrilobitCS.Models.User", "InvitedBy")
+                        .WithMany()
+                        .HasForeignKey("InvitedById")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("TrilobitCS.Models.EagleFeather", "EagleFeather")
+                    b.HasOne("TrilobitCS.Models.User", "InvitedUser")
+                        .WithMany("ReceivedInvites")
+                        .HasForeignKey("InvitedUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TrilobitCS.Models.Organisation", "Organisation")
+                        .WithMany("Invites")
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InvitedBy");
+
+                    b.Navigation("InvitedUser");
+
+                    b.Navigation("Organisation");
+                });
+
+            modelBuilder.Entity("TrilobitCS.Models.Post", b =>
+                {
+                    b.HasOne("TrilobitCS.Models.Challenge", "Challenge")
                         .WithMany()
-                        .HasForeignKey("EagleFeatherId")
+                        .HasForeignKey("ChallengeId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("TrilobitCS.Models.Organisation", "Organisation")
@@ -589,19 +583,25 @@ namespace TrilobitCS.Migrations
                         .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("TrilobitCS.Models.UserEagleFeather", "UserEagleFeather")
+                        .WithMany("Posts")
+                        .HasForeignKey("UserEagleFeatherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TrilobitCS.Models.User", "User")
                         .WithMany("Posts")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ChallengeCompletion");
-
-                    b.Navigation("EagleFeather");
+                    b.Navigation("Challenge");
 
                     b.Navigation("Organisation");
 
                     b.Navigation("User");
+
+                    b.Navigation("UserEagleFeather");
                 });
 
             modelBuilder.Entity("TrilobitCS.Models.RefreshToken", b =>
@@ -623,6 +623,25 @@ namespace TrilobitCS.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Organisation");
+                });
+
+            modelBuilder.Entity("TrilobitCS.Models.UserChallenge", b =>
+                {
+                    b.HasOne("TrilobitCS.Models.Challenge", "Challenge")
+                        .WithMany("UserChallenges")
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TrilobitCS.Models.User", "User")
+                        .WithMany("UserChallenges")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Challenge");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TrilobitCS.Models.UserEagleFeather", b =>
@@ -653,19 +672,7 @@ namespace TrilobitCS.Migrations
 
             modelBuilder.Entity("TrilobitCS.Models.Challenge", b =>
                 {
-                    b.Navigation("Completions");
-                });
-
-            modelBuilder.Entity("TrilobitCS.Models.ChallengeCompletion", b =>
-                {
-                    b.Navigation("Posts");
-                });
-
-            modelBuilder.Entity("TrilobitCS.Models.Comment", b =>
-                {
-                    b.Navigation("Likes");
-
-                    b.Navigation("Replies");
+                    b.Navigation("UserChallenges");
                 });
 
             modelBuilder.Entity("TrilobitCS.Models.EagleFeather", b =>
@@ -677,22 +684,15 @@ namespace TrilobitCS.Migrations
 
             modelBuilder.Entity("TrilobitCS.Models.Organisation", b =>
                 {
+                    b.Navigation("Invites");
+
                     b.Navigation("Members");
 
                     b.Navigation("Posts");
                 });
 
-            modelBuilder.Entity("TrilobitCS.Models.Post", b =>
-                {
-                    b.Navigation("Comments");
-
-                    b.Navigation("Likes");
-                });
-
             modelBuilder.Entity("TrilobitCS.Models.User", b =>
                 {
-                    b.Navigation("ChallengeCompletions");
-
                     b.Navigation("Comments");
 
                     b.Navigation("EagleFeathers");
@@ -703,6 +703,15 @@ namespace TrilobitCS.Migrations
 
                     b.Navigation("Likes");
 
+                    b.Navigation("Posts");
+
+                    b.Navigation("ReceivedInvites");
+
+                    b.Navigation("UserChallenges");
+                });
+
+            modelBuilder.Entity("TrilobitCS.Models.UserEagleFeather", b =>
+                {
                     b.Navigation("Posts");
                 });
 #pragma warning restore 612, 618

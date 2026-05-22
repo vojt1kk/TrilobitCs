@@ -8,9 +8,12 @@ public class UserEagleFeather
     public int EagleFeatherId { get; set; }
     public EagleFeather EagleFeather { get; set; } = null!;
     public bool IsGrandChallenge { get; set; }
+    public bool IsCompleted { get; set; } = false;
     public EagleFeatherStatus Status { get; set; } = EagleFeatherStatus.Pending;
     public int? VerifiedById { get; set; }
     public User? VerifiedBy { get; set; }
     public DateTime? EarnedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public ICollection<Post> Posts { get; set; } = new List<Post>();
 }

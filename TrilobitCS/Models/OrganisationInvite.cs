@@ -10,5 +10,7 @@ public class OrganisationInvite
     public int? InvitedById { get; set; }
     public User? InvitedBy { get; set; }
     public OrganisationInviteStatus Status { get; set; } = OrganisationInviteStatus.Pending;
+    public DateTime? AcceptedAt { get; set; }
+    public DateTime? DeclinedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 }

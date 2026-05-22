@@ -32,16 +32,19 @@ public class AcceptOrganisationInviteHandler : IRequestHandler<AcceptOrganisatio
             throw new ConflictException("errors.user_already_in_organisation");
 
         invite.Status = OrganisationInviteStatus.Accepted;
+        invite.AcceptedAt = DateTime.UtcNow;
         invite.InvitedUser.OrganisationId = invite.OrganisationId;
+        await _db.SaveChangesAsync(cancellationToken);
 
+        var declinedAt = DateTime.UtcNow;
         // Auto-decline all other pending invites for this user.
         await _db.OrganisationInvites
             .Where(i => i.InvitedUserId == command.UserId
                         && i.Id != command.InviteId
                         && i.Status == OrganisationInviteStatus.Pending)
-            .ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, OrganisationInviteStatus.Declined), cancellationToken);
-
-        await _db.SaveChangesAsync(cancellationToken);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.Status, OrganisationInviteStatus.Declined)
+                .SetProperty(i => i.DeclinedAt, declinedAt), cancellationToken);
 
         return new OrganisationInviteResponse(
             invite.Id,

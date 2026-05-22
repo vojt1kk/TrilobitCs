@@ -14,7 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Organisation> Organisations => Set<Organisation>();
     public DbSet<UserEagleFeather> UserEagleFeathers => Set<UserEagleFeather>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
-    public DbSet<ChallengeCompletion> ChallengeCompletions => Set<ChallengeCompletion>();
+    public DbSet<UserChallenge> UserChallenges => Set<UserChallenge>();
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<Comment> Comments => Set<Comment>();
@@ -65,6 +65,9 @@ public class AppDbContext : DbContext
         {
             entity.HasIndex(uef => new { uef.UserId, uef.EagleFeatherId }).IsUnique();
 
+            entity.Property(uef => uef.IsCompleted)
+                .HasDefaultValue(false);
+
             entity.HasOne(uef => uef.User)
                 .WithMany(u => u.EagleFeathers)
                 .HasForeignKey(uef => uef.UserId)
@@ -86,21 +89,24 @@ public class AppDbContext : DbContext
             entity.HasOne(c => c.EagleFeather)
                 .WithMany(ef => ef.Challenges)
                 .HasForeignKey(c => c.EagleFeatherId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<ChallengeCompletion>(entity =>
+        modelBuilder.Entity<UserChallenge>(entity =>
         {
-            entity.HasIndex(cc => new { cc.UserId, cc.ChallengeId }).IsUnique();
+            entity.HasIndex(uc => new { uc.UserId, uc.ChallengeId }).IsUnique();
 
-            entity.HasOne(cc => cc.User)
-                .WithMany(u => u.ChallengeCompletions)
-                .HasForeignKey(cc => cc.UserId)
+            entity.Property(uc => uc.PinnedAt)
+                .HasDefaultValueSql("now()");
+
+            entity.HasOne(uc => uc.User)
+                .WithMany(u => u.UserChallenges)
+                .HasForeignKey(uc => uc.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(cc => cc.Challenge)
-                .WithMany(c => c.Completions)
-                .HasForeignKey(cc => cc.ChallengeId)
+            entity.HasOne(uc => uc.Challenge)
+                .WithMany(c => c.UserChallenges)
+                .HasForeignKey(uc => uc.ChallengeId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -116,14 +122,15 @@ public class AppDbContext : DbContext
                 .HasForeignKey(p => p.OrganisationId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasOne(p => p.EagleFeather)
-                .WithMany()
-                .HasForeignKey(p => p.EagleFeatherId)
-                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(p => p.UserEagleFeather)
+                .WithMany(uef => uef.Posts)
+                .HasForeignKey(p => p.UserEagleFeatherId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(p => p.ChallengeCompletion)
-                .WithMany(cc => cc.Posts)
-                .HasForeignKey(p => p.ChallengeCompletionId)
+            entity.HasOne(p => p.Challenge)
+                .WithMany()
+                .HasForeignKey(p => p.ChallengeId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -136,16 +143,6 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Likes)
                 .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(l => l.Post)
-                .WithMany(p => p.Likes)
-                .HasForeignKey(l => l.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(l => l.Comment)
-                .WithMany(c => c.Likes)
-                .HasForeignKey(l => l.CommentId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Comment>(entity =>
@@ -156,24 +153,15 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Comments)
                 .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(c => c.Post)
-                .WithMany(p => p.Comments)
-                .HasForeignKey(c => c.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(c => c.Parent)
-                .WithMany(c => c.Replies)
-                .HasForeignKey(c => c.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<OrganisationInvite>(entity =>
         {
-            // Partial unique index: one pending invite per (user, organisation) pair.
-            entity.HasIndex(i => new { i.InvitedUserId, i.OrganisationId })
-                .IsUnique()
-                .HasFilter("\"Status\" = 0");
+            // Partial unique using PostgreSQL NULL != NULL semantics on DeclinedAt:
+            // a new pending invite (DeclinedAt = NULL) can coexist with a declined one (DeclinedAt != NULL)
+            // for the same (InvitedUserId, OrganisationId) pair.
+            entity.HasIndex(i => new { i.InvitedUserId, i.OrganisationId, i.DeclinedAt })
+                .IsUnique();
 
             entity.HasOne(i => i.Organisation)
                 .WithMany(o => o.Invites)

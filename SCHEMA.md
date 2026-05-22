@@ -43,6 +43,8 @@ Table followers {
   indexes {
     (follower_id, following_id) [unique]
   }
+
+  note: 'CHECK constraint v migraci: follower_id != following_id'
 }
 
 // =====================
@@ -70,6 +72,7 @@ Table user_eagle_feathers {
   user_id int [not null]
   eagle_feather_id int [not null]
   is_grand_challenge boolean [default: false, note: 'false=čin, true=velký čin']
+  is_completed boolean [default: false, note: 'true při vytvoření postu, false při smazání postu']
   status int [default: 0, note: '0=Pending, 1=Approved, 2=Rejected']
   verified_by int [note: 'FK -> users (leader)']
   earned_at timestamp
@@ -85,22 +88,21 @@ Table user_eagle_feathers {
 // =====================
 Table challenges {
   id int [pk, increment]
+  eagle_feather_id int [not null, note: 'náhodně vybrané orli pero pro tuto challenge']
   title varchar(150) [not null]
   description text
-  eagle_feather_id int [note: 'odměna za splnění']
   difficulty_level int [note: '1-3 hvězdičky']
   valid_from timestamp
   valid_to timestamp
   created_at timestamp [default: `now()`]
 }
 
-Table challenge_completions {
+Table user_challenges {
   id int [pk, increment]
   user_id int [not null]
   challenge_id int [not null]
-  result_value decimal(8,2) [note: 'např. 11.25 (sekundy)']
-  result_unit varchar(20) [note: 's | m | reps...']
-  completed_at timestamp [default: `now()`]
+  pinned_at timestamp [not null, default: `now()`]
+  unpinned_at timestamp [note: 'null = aktuálně pinnuto']
 
   indexes {
     (user_id, challenge_id) [unique]
@@ -115,9 +117,23 @@ Table organisations {
   name varchar(100) [not null]
   description text
   avatar_url varchar(255)
-  invite_code varchar(20) [unique]
-  leader_id int [not null, note: 'FK -> users (role=Leader)']
+  leader_id int [not null, note: 'FK -> users (role=Leader), ON DELETE RESTRICT']
   created_at timestamp [default: `now()`]
+}
+
+Table organisation_invites {
+  id int [pk, increment]
+  organisation_id int [not null]
+  invited_user_id int [not null]
+  invited_by_id int [note: 'null pokud leader byl smazán']
+  status int [default: 0, note: '0=Pending, 1=Accepted, 2=Declined']
+  accepted_at timestamp [note: 'null = nebylo přijato']
+  declined_at timestamp [note: 'null = nebylo odmítnuto']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (invited_user_id, organisation_id, declined_at) [unique, note: 'PostgreSQL NULL!=NULL: pending (declined_at=NULL) koexistuje s declined (declined_at!=NULL)']
+  }
 }
 
 // =====================
@@ -127,23 +143,21 @@ Table posts {
   id int [pk, increment]
   user_id int [not null]
   organisation_id int [note: 'null = jen pro followers']
-  eagle_feather_id int [note: 'pokud post je o získání pera']
-  challenge_completion_id int [note: 'pokud post je o splnění výzvy']
+  user_eagle_feather_id int [not null, note: 'vždy přítomné — post je vždy o konkrétním EF']
+  challenge_id int [note: 'null = post nevznikl přes challenge']
   content text
   image_url varchar(255)
   created_at timestamp [default: `now()`]
 }
 
 // =====================
-// LIKES (polymorfní)
+// LIKES (polymorfní — čistý)
 // =====================
 Table likes {
   id int [pk, increment]
   user_id int [not null]
   likeable_type int [not null, note: '0=Posts, 1=Comments']
-  likeable_id int [not null]
-  post_id int [note: 'null = like není na postu']
-  comment_id int [note: 'null = like není na komentáři']
+  likeable_id int [not null, note: 'FK není vynuceno DB — zajišťuje aplikační vrstva']
   created_at timestamp [default: `now()`]
 
   indexes {
@@ -153,15 +167,13 @@ Table likes {
 }
 
 // =====================
-// COMMENTS (polymorfní)
+// COMMENTS (polymorfní — čistý)
 // =====================
 Table comments {
   id int [pk, increment]
   user_id int [not null]
-  post_id int [note: 'null = komentář není na postu (je reply)']
   commentable_type int [not null, note: '0=Posts, 1=Comments']
-  commentable_id int [not null]
-  parent_id int [note: 'null = top-level, jinak reply']
+  commentable_id int [not null, note: 'FK není vynuceno DB — zajišťuje aplikační vrstva']
   content text [not null]
   created_at timestamp [default: `now()`]
 
@@ -189,11 +201,12 @@ TableGroup feathers {
 
 TableGroup challenges_group {
   challenges
-  challenge_completions
+  user_challenges
 }
 
 TableGroup org {
   organisations
+  organisation_invites
 }
 
 TableGroup feed {
@@ -218,19 +231,22 @@ Ref: user_eagle_feathers.eagle_feather_id > eagle_feathers.id
 Ref: user_eagle_feathers.verified_by > users.id
 
 Ref: challenges.eagle_feather_id > eagle_feathers.id
-Ref: challenge_completions.user_id > users.id
-Ref: challenge_completions.challenge_id > challenges.id
+
+Ref: user_challenges.user_id > users.id
+Ref: user_challenges.challenge_id > challenges.id
+
+Ref: organisation_invites.organisation_id > organisations.id
+Ref: organisation_invites.invited_user_id > users.id
+Ref: organisation_invites.invited_by_id > users.id
 
 Ref: posts.user_id > users.id
 Ref: posts.organisation_id > organisations.id
-Ref: posts.eagle_feather_id > eagle_feathers.id
-Ref: posts.challenge_completion_id > challenge_completions.id
+Ref: posts.user_eagle_feather_id > user_eagle_feathers.id
+Ref: posts.challenge_id > challenges.id
 
 Ref: likes.user_id > users.id
-Ref: likes.post_id > posts.id
-Ref: likes.comment_id > comments.id
+// likes.likeable_id — bez DB ref (polymorfní)
 
 Ref: comments.user_id > users.id
-Ref: comments.post_id > posts.id
-Ref: comments.parent_id > comments.id
+// comments.commentable_id — bez DB ref (polymorfní)
 ```

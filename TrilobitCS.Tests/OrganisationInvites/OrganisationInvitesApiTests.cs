@@ -254,6 +254,67 @@ public class OrganisationInvitesApiTests : ApiTestBase
         body.GetProperty("message").GetString().Should().Be("errors.invite_not_pending");
     }
 
+    [Fact]
+    public async Task Accept_SetsAcceptedAt()
+    {
+        var (leaderToken, _) = await CreateOrganisationAsLeader();
+        var memberReq = RegisterRequestFactory.Make();
+        var memberToken = await RegisterAndGetToken(memberReq);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", leaderToken);
+        var inviteId = await SendInviteAndGetId(memberReq.Nickname);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        await _client.PostAsJsonAsync($"/api/organisation-invites/{inviteId}/accept", new { });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invite = await db.OrganisationInvites.FindAsync(inviteId);
+        invite!.AcceptedAt.Should().NotBeNull();
+        invite.DeclinedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Decline_SetsDeclinedAt()
+    {
+        var (leaderToken, _) = await CreateOrganisationAsLeader();
+        var memberReq = RegisterRequestFactory.Make();
+        var memberToken = await RegisterAndGetToken(memberReq);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", leaderToken);
+        var inviteId = await SendInviteAndGetId(memberReq.Nickname);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        await _client.PostAsJsonAsync($"/api/organisation-invites/{inviteId}/decline", new { });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invite = await db.OrganisationInvites.FindAsync(inviteId);
+        invite!.DeclinedAt.Should().NotBeNull();
+        invite.AcceptedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Send_AfterDecline_AllowsNewInvite()
+    {
+        var (leaderToken, _) = await CreateOrganisationAsLeader();
+        var memberReq = RegisterRequestFactory.Make();
+        var memberToken = await RegisterAndGetToken(memberReq);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", leaderToken);
+        var firstInviteId = await SendInviteAndGetId(memberReq.Nickname);
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        await _client.PostAsJsonAsync($"/api/organisation-invites/{firstInviteId}/decline", new { });
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", leaderToken);
+        var response = await _client.PostAsJsonAsync("/api/organisation-invites", new { nickname = memberReq.Nickname });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().Should().Be(0);
+    }
+
     // =====================
     private async Task<int> SendInviteAndGetId(string nickname)
     {

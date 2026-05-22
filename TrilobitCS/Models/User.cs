@@ -19,7 +19,7 @@ public class User
     public ICollection<Follower> Following { get; set; } = new List<Follower>();
     public ICollection<Follower> Followers { get; set; } = new List<Follower>();
     public ICollection<UserEagleFeather> EagleFeathers { get; set; } = new List<UserEagleFeather>();
-    public ICollection<ChallengeCompletion> ChallengeCompletions { get; set; } = new List<ChallengeCompletion>();
+    public ICollection<UserChallenge> UserChallenges { get; set; } = new List<UserChallenge>();
     public ICollection<Post> Posts { get; set; } = new List<Post>();
     public ICollection<Like> Likes { get; set; } = new List<Like>();
     public ICollection<Comment> Comments { get; set; } = new List<Comment>();
