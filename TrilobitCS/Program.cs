@@ -85,6 +85,7 @@ try
     builder.Services.AddOpenApi(options =>
     {
         options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+        options.AddSchemaTransformer<EnumSchemaTransformer>();
     });
 
     builder.Services.AddFluentValidationAutoValidation();

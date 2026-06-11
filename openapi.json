@@ -2251,7 +2251,18 @@
         }
       },
       "Gender": {
-        "type": "integer"
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32",
+        "x-enum-varnames": [
+          "Male",
+          "Female",
+          "Other"
+        ]
       },
       "LoginRequest": {
         "required": [
@@ -2310,7 +2321,18 @@
         }
       },
       "OrganisationInviteStatus": {
-        "type": "integer"
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32",
+        "x-enum-varnames": [
+          "Pending",
+          "Accepted",
+          "Declined"
+        ]
       },
       "OrganisationLeaderResponse": {
         "required": [
@@ -2856,7 +2878,16 @@
         }
       },
       "UserRole": {
-        "type": "integer"
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32",
+        "x-enum-varnames": [
+          "User",
+          "Leader"
+        ]
       }
     },
     "securitySchemes": {
