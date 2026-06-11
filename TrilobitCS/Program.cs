@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
@@ -139,13 +140,17 @@ try
 
     var app = builder.Build();
 
-    Log.Information("Applying database migrations...");
-    using (var scope = app.Services.CreateScope())
+    // Skip migrations when the OpenAPI build-time tool (GetDocument.Insider) runs the
+    // entry point — it executes everything up to app.Run() but has no database available.
+    var isOpenApiBuildTool = Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
+    if (!isOpenApiBuildTool)
     {
+        Log.Information("Applying database migrations...");
+        using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
+        Log.Information("Migrations applied. Starting server...");
     }
-    Log.Information("Migrations applied. Starting server...");
 
     if (args.Contains("scrape"))
     {

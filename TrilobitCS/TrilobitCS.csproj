@@ -6,7 +6,23 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
+
+        <!-- Emit the OpenAPI document to the repo root as openapi.json on every build,
+             so the frontend can generate API clients without running the backend.
+             Generation invokes Program's entry point up to app.Run() — DB migration is
+             guarded in Program.cs against the GetDocument.Insider tool. -->
+        <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+        <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/..</OpenApiDocumentsDirectory>
     </PropertyGroup>
+
+    <!-- The tool names the file after the assembly (TrilobitCS.json); rename to the
+         conventional openapi.json at the repo root for the frontend client generator. -->
+    <Target Name="RenameOpenApiDocument" AfterTargets="GenerateOpenApiDocuments"
+            Condition="Exists('$(OpenApiDocumentsDirectory)/$(AssemblyName).json')">
+        <Move SourceFiles="$(OpenApiDocumentsDirectory)/$(AssemblyName).json"
+              DestinationFiles="$(OpenApiDocumentsDirectory)/openapi.json"
+              OverwriteReadOnlyFiles="true" />
+    </Target>
 
     <ItemGroup>
         <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
@@ -16,6 +32,10 @@
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.*" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.*" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.*" />
+        <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="9.*">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.*" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.*" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.*" />
