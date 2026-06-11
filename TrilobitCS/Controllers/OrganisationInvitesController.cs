@@ -27,6 +27,7 @@ public class OrganisationInvitesController : ControllerBase
     /// <response code="404">Target user not found</response>
     /// <response code="422">User already in an organisation or a pending invite already exists</response>
     [HttpPost("api/organisation-invites")]
+    [EndpointName("sendOrganisationInvite")]
     [ProducesResponseType(typeof(OrganisationInviteResponse), 201)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
@@ -40,6 +41,7 @@ public class OrganisationInvitesController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="422">Invalid pagination parameters</response>
     [HttpGet("api/organisation-invites")]
+    [EndpointName("getOrganisationInvites")]
     [ProducesResponseType(typeof(PagedResponse<OrganisationInviteResponse>), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(422)]
@@ -52,6 +54,7 @@ public class OrganisationInvitesController : ControllerBase
     /// <response code="404">Invite not found or does not belong to this user</response>
     /// <response code="422">Invite is not pending or user is already in an organisation</response>
     [HttpPost("api/organisation-invites/{id:int}/accept")]
+    [EndpointName("acceptOrganisationInvite")]
     [ProducesResponseType(typeof(OrganisationInviteResponse), 201)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -65,6 +68,7 @@ public class OrganisationInvitesController : ControllerBase
     /// <response code="404">Invite not found or does not belong to this user</response>
     /// <response code="422">Invite is not pending</response>
     [HttpPost("api/organisation-invites/{id:int}/decline")]
+    [EndpointName("declineOrganisationInvite")]
     [ProducesResponseType(typeof(OrganisationInviteResponse), 201)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

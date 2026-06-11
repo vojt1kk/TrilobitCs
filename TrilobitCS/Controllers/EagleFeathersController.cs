@@ -28,6 +28,7 @@ public class EagleFeathersController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="422">Invalid pagination parameters</response>
     [HttpGet]
+    [EndpointName("getEagleFeathers")]
     [ProducesResponseType(typeof(PagedResponse<EagleFeatherResponse>), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(422)]
@@ -41,6 +42,7 @@ public class EagleFeathersController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Eagle feather not found</response>
     [HttpGet("{id:int}")]
+    [EndpointName("getEagleFeatherById")]
     [ProducesResponseType(typeof(EagleFeatherResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

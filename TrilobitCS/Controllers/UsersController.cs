@@ -24,6 +24,7 @@ public class UsersController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">User not found</response>
     [HttpGet("api/users/{id:int}")]
+    [EndpointName("getUser")]
     [ProducesResponseType(typeof(PublicUserResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -34,6 +35,7 @@ public class UsersController : ControllerBase
     /// <response code="200">Own profile</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet("api/user/me")]
+    [EndpointName("getCurrentUser")]
     [ProducesResponseType(typeof(UserMeResponse), 200)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> Me(CancellationToken ct)
@@ -44,6 +46,7 @@ public class UsersController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="422">Invalid data or nickname already taken</response>
     [HttpPut("api/user")]
+    [EndpointName("updateCurrentUser")]
     [ProducesResponseType(typeof(UserMeResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(422)]
@@ -54,6 +57,7 @@ public class UsersController : ControllerBase
     /// <response code="204">Account deleted</response>
     /// <response code="401">Unauthorized</response>
     [HttpDelete("api/user")]
+    [EndpointName("deleteCurrentUser")]
     [ProducesResponseType(204)]
     [ProducesResponseType(401)]
     public async Task<IActionResult> Destroy(CancellationToken ct)
@@ -67,6 +71,7 @@ public class UsersController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="422">User is not in an organisation or is the leader</response>
     [HttpDelete("api/user/organisation")]
+    [EndpointName("leaveOrganisation")]
     [ProducesResponseType(204)]
     [ProducesResponseType(401)]
     [ProducesResponseType(422)]

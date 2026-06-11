@@ -24,6 +24,7 @@ public class PostsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Post not found</response>
     [HttpGet("api/posts/{id:int}")]
+    [EndpointName("getPost")]
     [ProducesResponseType(typeof(PostResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -37,6 +38,7 @@ public class PostsController : ControllerBase
     /// <response code="404">UserEagleFeatherId or OrganisationId not found</response>
     /// <response code="422">Content and imageUrl both missing</response>
     [HttpPost("api/user-eagle-feathers/{uefId:int}/posts")]
+    [EndpointName("createPost")]
     [ProducesResponseType(typeof(PostResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
@@ -52,6 +54,7 @@ public class PostsController : ControllerBase
     /// <response code="404">Post not found</response>
     /// <response code="422">Content and imageUrl both missing</response>
     [HttpPut("api/posts/{id:int}")]
+    [EndpointName("updatePost")]
     [ProducesResponseType(typeof(PostResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
@@ -66,6 +69,7 @@ public class PostsController : ControllerBase
     /// <response code="403">Post does not belong to the authenticated user</response>
     /// <response code="404">Post not found</response>
     [HttpDelete("api/posts/{id:int}")]
+    [EndpointName("deletePost")]
     [ProducesResponseType(204)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]

@@ -26,6 +26,7 @@ public class OrganisationsController : ControllerBase
     /// <response code="403">User is not a Leader</response>
     /// <response code="422">Leader already has an organisation or invalid data</response>
     [HttpPost("api/organisations")]
+    [EndpointName("createOrganisation")]
     [ProducesResponseType(typeof(OrganisationResponse), 201)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
@@ -38,6 +39,7 @@ public class OrganisationsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Organisation not found</response>
     [HttpGet("api/organisations/{id:int}")]
+    [EndpointName("getOrganisation")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -51,6 +53,7 @@ public class OrganisationsController : ControllerBase
     /// <response code="404">Organisation not found</response>
     /// <response code="422">Invalid data</response>
     [HttpPut("api/organisations/{id:int}")]
+    [EndpointName("updateOrganisation")]
     [ProducesResponseType(typeof(OrganisationResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
@@ -65,6 +68,7 @@ public class OrganisationsController : ControllerBase
     /// <response code="404">Organisation not found</response>
     /// <response code="422">Invalid pagination parameters</response>
     [HttpGet("api/organisations/{id:int}/members")]
+    [EndpointName("getOrganisationMembers")]
     [ProducesResponseType(typeof(PagedResponse<OrganisationMemberResponse>), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]

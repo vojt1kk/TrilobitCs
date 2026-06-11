@@ -10,6 +10,7 @@
         "tags": [
           "Auth"
         ],
+        "operationId": "register",
         "requestBody": {
           "content": {
             "application/json": {
@@ -84,6 +85,7 @@
         "tags": [
           "Auth"
         ],
+        "operationId": "login",
         "requestBody": {
           "content": {
             "application/json": {
@@ -158,6 +160,7 @@
         "tags": [
           "Auth"
         ],
+        "operationId": "refreshToken",
         "requestBody": {
           "content": {
             "application/json": {
@@ -232,6 +235,7 @@
         "tags": [
           "Auth"
         ],
+        "operationId": "logout",
         "requestBody": {
           "content": {
             "application/json": {
@@ -289,6 +293,7 @@
         "tags": [
           "EagleFeathers"
         ],
+        "operationId": "getEagleFeathers",
         "parameters": [
           {
             "name": "Page",
@@ -381,6 +386,7 @@
         "tags": [
           "EagleFeathers"
         ],
+        "operationId": "getEagleFeatherById",
         "parameters": [
           {
             "name": "id",
@@ -466,6 +472,7 @@
         "tags": [
           "OrganisationInvites"
         ],
+        "operationId": "sendOrganisationInvite",
         "requestBody": {
           "content": {
             "application/json": {
@@ -598,6 +605,7 @@
         "tags": [
           "OrganisationInvites"
         ],
+        "operationId": "getOrganisationInvites",
         "parameters": [
           {
             "name": "Page",
@@ -690,6 +698,7 @@
         "tags": [
           "OrganisationInvites"
         ],
+        "operationId": "acceptOrganisationInvite",
         "parameters": [
           {
             "name": "id",
@@ -795,6 +804,7 @@
         "tags": [
           "OrganisationInvites"
         ],
+        "operationId": "declineOrganisationInvite",
         "parameters": [
           {
             "name": "id",
@@ -900,6 +910,7 @@
         "tags": [
           "Organisations"
         ],
+        "operationId": "createOrganisation",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1014,6 +1025,7 @@
         "tags": [
           "Organisations"
         ],
+        "operationId": "getOrganisation",
         "parameters": [
           {
             "name": "id",
@@ -1097,6 +1109,7 @@
         "tags": [
           "Organisations"
         ],
+        "operationId": "updateOrganisation",
         "parameters": [
           {
             "name": "id",
@@ -1242,6 +1255,7 @@
         "tags": [
           "Organisations"
         ],
+        "operationId": "getOrganisationMembers",
         "parameters": [
           {
             "name": "id",
@@ -1363,6 +1377,7 @@
         "tags": [
           "Posts"
         ],
+        "operationId": "getPost",
         "parameters": [
           {
             "name": "id",
@@ -1446,6 +1461,7 @@
         "tags": [
           "Posts"
         ],
+        "operationId": "updatePost",
         "parameters": [
           {
             "name": "id",
@@ -1589,6 +1605,7 @@
         "tags": [
           "Posts"
         ],
+        "operationId": "deletePost",
         "parameters": [
           {
             "name": "id",
@@ -1677,6 +1694,7 @@
         "tags": [
           "Posts"
         ],
+        "operationId": "createPost",
         "parameters": [
           {
             "name": "uefId",
@@ -1822,6 +1840,7 @@
         "tags": [
           "Users"
         ],
+        "operationId": "getUser",
         "parameters": [
           {
             "name": "id",
@@ -1907,6 +1926,7 @@
         "tags": [
           "Users"
         ],
+        "operationId": "getCurrentUser",
         "responses": {
           "200": {
             "description": "OK",
@@ -1961,6 +1981,7 @@
         "tags": [
           "Users"
         ],
+        "operationId": "updateCurrentUser",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2053,6 +2074,7 @@
         "tags": [
           "Users"
         ],
+        "operationId": "deleteCurrentUser",
         "responses": {
           "204": {
             "description": "No Content"
@@ -2090,6 +2112,7 @@
         "tags": [
           "Users"
         ],
+        "operationId": "leaveOrganisation",
         "responses": {
           "204": {
             "description": "No Content"

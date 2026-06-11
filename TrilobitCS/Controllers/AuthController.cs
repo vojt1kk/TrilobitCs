@@ -22,6 +22,7 @@ public class AuthController : ControllerBase
     /// <response code="201">Returns access token and refresh token</response>
     /// <response code="422">Invalid data (password mismatch, duplicate email/nickname)</response>
     [HttpPost("register")]
+    [EndpointName("register")]
     [ProducesResponseType(typeof(AuthResponse), 201)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
@@ -32,6 +33,7 @@ public class AuthController : ControllerBase
     /// <response code="401">Invalid credentials</response>
     /// <response code="429">Too many requests</response>
     [HttpPost("login")]
+    [EndpointName("login")]
     [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(AuthResponse), 201)]
     [ProducesResponseType(401)]
@@ -43,6 +45,7 @@ public class AuthController : ControllerBase
     /// <response code="401">Invalid or already used refresh token</response>
     /// <response code="429">Too many requests</response>
     [HttpPost("refresh")]
+    [EndpointName("refreshToken")]
     [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(AuthResponse), 201)]
     [ProducesResponseType(401)]
@@ -53,6 +56,7 @@ public class AuthController : ControllerBase
     /// <response code="204">Token successfully revoked</response>
     /// <response code="404">Token not found</response>
     [HttpPost("logout")]
+    [EndpointName("logout")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> Logout(RefreshRequest request, CancellationToken ct)
