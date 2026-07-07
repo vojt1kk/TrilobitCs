@@ -110,14 +110,14 @@ try
         };
     });
 
-    // var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-    // builder.Services.AddCors(options =>
-    // {
-    //     options.AddPolicy("Frontend", policy =>
-    //         policy.WithOrigins(allowedOrigins)
-    //               .AllowAnyHeader()
-    //               .AllowAnyMethod());
-    // });
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("Frontend", policy =>
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod());
+    });
 
     // Rate limiting for auth endpoints — per-IP, 5 requests per minute, disabled in testing.
     if (!builder.Environment.IsEnvironment("Testing"))
@@ -178,7 +178,7 @@ try
 
     app.UseSerilogRequestLogging();
 
-    // app.UseCors("Frontend");
+    app.UseCors("Frontend");
 
     if (!app.Environment.IsEnvironment("Testing"))
         app.UseRateLimiter();
