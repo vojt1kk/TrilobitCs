@@ -285,6 +285,13 @@ Program.cs používá `JwtSecurityTokenHandler` místo moderního `JsonWebTokenH
 
 Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `/scalar/v1`, OpenAPI dokument na `/openapi/v1.json`. FluentValidation pravidla (max length, required) nejsou automaticky propagovány do OpenAPI schématu — akceptovaný kompromis.
 
+### User Eagle Feathers TODO (známé zjednodušení pro MVP)
+
+- **Pending fronta:** dnes vrací všechny pending UEF v systému. Later: 2. subresource `/api/user-eagle-feathers/pending/my-org` pro filtr na Leaderovu organizaci (FE zobrazí 2 subkarty „Všichni" / „Moje org").
+- **UEF filtry v GET `/api/user/eagle-feathers`:** dnes bez query filtrů. Later: `?status`, `?isGrandChallenge`, `?eagleFeatherId`.
+- **Retry spam:** `POST /retry` bez rate limitu / retry_count / rejected_at. Later: pokud v praxi spam, přidat sloupec `retry_count` + limit.
+- **Grand challenge upgrade:** `is_grand_challenge` je immutable. Známé limitation: dítě se schváleným činem, které chce jít na velký čin téhož pera, musí DELETE + POST nový (ztratí historii Approved). Produktové rozhodnutí: paralelní čin + velký čin na jednom peru? Řešení: změnit UNIQUE na `(user_id, eagle_feather_id, is_grand_challenge)` + rozhodnout leaderboard logiku.
+
 ---
 
 ## Existující API endpointy
@@ -471,6 +478,49 @@ Status: `0` = Pending, `1` = Accepted, `2` = Declined
 }
 ```
 
+### User Eagle Feathers (`/api/user-eagle-feathers`, `/api/user/eagle-feathers`)
+
+Workflow získání pera. UEF = jeden pokus dítěte získat konkrétní pero. Vzniká explicitně (dítě si pero „nastartuje"), posty se k němu přidávají přes existující `POST /api/user-eagle-feathers/{uefId}/posts`.
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/user-eagle-feathers` | ano | `CreateUserEagleFeatherRequest` | `UserEagleFeatherResponse` (201) | Vytvoří UEF (Status=Pending). 404 pokud pero neexistuje, 422 pro duplicitu (user, feather). |
+| GET | `/api/user/eagle-feathers` | ano | — | `PagedResponse<UserEagleFeatherResponse>` (200) | Moje UEF (paginated, bez filtrů). |
+| DELETE | `/api/user-eagle-feathers/{id}` | vlastník | — | 204 No Content | Smaže UEF + **cascade smaže připojené posty**. Povoleno ve všech statusech (i Approved). |
+| POST | `/api/user-eagle-feathers/{id}/retry` | vlastník | — | `UserEagleFeatherResponse` (201) | Rejected → Pending. Vynuluje VerifiedById/EarnedAt/ModeratorNote. 422 pokud není Rejected. |
+| GET | `/api/user-eagle-feathers/pending` | Leader | — | `PagedResponse<UserEagleFeatherResponse>` (200) | Všechny pending UEF v systému (napříč orgy). 403 pro non-Leadera. |
+| POST | `/api/user-eagle-feathers/{id}/approve` | Leader | `ModerateUserEagleFeatherRequest` | `UserEagleFeatherResponse` (201) | Status=Approved, EarnedAt=now, VerifiedById=leader, ModeratorNote=note. 422 pokud není Pending. |
+| POST | `/api/user-eagle-feathers/{id}/reject` | Leader | `ModerateUserEagleFeatherRequest` | `UserEagleFeatherResponse` (201) | Status=Rejected, VerifiedById=leader, ModeratorNote=note. **Posty se nemažou.** 422 pokud není Pending. |
+
+Schvalovat/zamítat smí **kterýkoli Leader** (`role = Leader`), bez vazby na organizaci dítěte. `IsGrandChallenge` je immutable po vytvoření.
+
+**CreateUserEagleFeatherRequest:**
+```json
+{ "eagleFeatherId": 5, "isGrandChallenge": false }
+```
+
+**ModerateUserEagleFeatherRequest** (approve i reject):
+```json
+{ "note": "string? (max 255, optional)" }
+```
+
+**UserEagleFeatherResponse:**
+```json
+{
+  "id": 1,
+  "userId": 3,
+  "eagleFeatherId": 5,
+  "isGrandChallenge": false,
+  "isCompleted": false,
+  "status": 0,
+  "verifiedById": null,
+  "moderatorNote": null,
+  "earnedAt": null,
+  "createdAt": "2026-07-13T..."
+}
+```
+Status: `0` = Pending, `1` = Approved, `2` = Rejected (serializováno jako int).
+
 ---
 
 ## Databázové schéma (kompletní)
@@ -541,15 +591,16 @@ followers
   UNIQUE(follower_id, following_id)
   CHECK(follower_id <> following_id)
 
-user_eagle_feathers
+user_eagle_feathers  -- API implementováno (create/list/delete/retry/pending/approve/reject)
   id               PK
   user_id          FK → users.id
   eagle_feather_id FK → eagle_feathers.id
-  is_grand_challenge boolean DEFAULT false     -- false=čin, true=velký čin
+  is_grand_challenge boolean DEFAULT false     -- false=čin, true=velký čin (immutable po vytvoření)
   is_completed     boolean DEFAULT false       -- true při vytvoření postu, false při smazání postu (aplikační logika)
   status           int          DEFAULT 0      -- enum: 0=Pending, 1=Approved, 2=Rejected
   verified_by      FK → users.id (leader, nullable)
-  earned_at        timestamp (nullable)
+  moderator_note   text (nullable)             -- poznámka Leadera při approve/reject (max 255 hlídá validátor); vynulována při retry
+  earned_at        timestamp (nullable)        -- nastaveno jen při Approved
   created_at       timestamp
   UNIQUE(user_id, eagle_feather_id)
 
@@ -557,7 +608,7 @@ posts
   id                    PK
   user_id               FK → users.id
   organisation_id       FK → organisations.id (nullable — null = jen pro followers)
-  user_eagle_feather_id FK → user_eagle_feathers.id NOT NULL — post je vždy o konkrétním peru
+  user_eagle_feather_id FK → user_eagle_feathers.id NOT NULL, Cascade on delete — smazání UEF smaže i posty
   challenge_id          FK → challenges.id (nullable — post vznikl přes challenge)
   content               text
   image_url             varchar(255)

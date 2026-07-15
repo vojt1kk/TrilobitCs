@@ -12,6 +12,7 @@ public class UserEagleFeather
     public EagleFeatherStatus Status { get; set; } = EagleFeatherStatus.Pending;
     public int? VerifiedById { get; set; }
     public User? VerifiedBy { get; set; }
+    public string? ModeratorNote { get; set; }
     public DateTime? EarnedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 

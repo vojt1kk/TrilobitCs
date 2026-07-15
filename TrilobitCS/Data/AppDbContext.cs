@@ -126,7 +126,7 @@ public class AppDbContext : DbContext
                 .WithMany(uef => uef.Posts)
                 .HasForeignKey(p => p.UserEagleFeatherId)
                 .IsRequired()
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(p => p.Challenge)
                 .WithMany()
