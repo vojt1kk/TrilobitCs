@@ -193,6 +193,70 @@ public class UserEagleFeathersApiTests : ApiTestBase
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
+    [Fact]
+    public async Task Delete_CascadesLikesAndMultiLevelCommentThread_NoOrphans()
+    {
+        var token = await RegisterAndGetToken();
+        SetAuth(token);
+        var userId = await GetUserIdFromToken(token);
+        var featherId = await SeedEagleFeatherAsync();
+        var uefId = await CreateUefAndGetId(featherId);
+
+        var postResp = await _client.PostAsJsonAsync($"/api/user-eagle-feathers/{uefId}/posts",
+            new { content = "achievement", imageUrl = (string?)null, organisationId = (int?)null, challengeId = (int?)null });
+        postResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var postId = (await postResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        var (rootCommentId, replyId, replyOfReplyId) = await SeedCommentThreadOnPostAsync(postId, userId);
+        await SeedLikesAsync(userId, (LikeableType.Posts, postId), (LikeableType.Comments, rootCommentId), (LikeableType.Comments, replyOfReplyId));
+
+        var response = await _client.DeleteAsync($"/api/user-eagle-feathers/{uefId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Posts.AnyAsync(p => p.Id == postId)).Should().BeFalse();
+        (await db.Comments.AnyAsync(c => c.Id == rootCommentId || c.Id == replyId || c.Id == replyOfReplyId)).Should().BeFalse();
+        (await db.Likes.AnyAsync(l => l.LikeableType == LikeableType.Posts && l.LikeableId == postId)).Should().BeFalse();
+        (await db.Likes.AnyAsync(l => l.LikeableType == LikeableType.Comments
+            && (l.LikeableId == rootCommentId || l.LikeableId == replyOfReplyId))).Should().BeFalse();
+    }
+
+    // =====================
+    // DELETE /api/posts/{id}
+    // =====================
+
+    [Fact]
+    public async Task DeletePost_CascadesMultiLevelCommentThreadAndLikes_NoOrphans()
+    {
+        var token = await RegisterAndGetToken();
+        SetAuth(token);
+        var userId = await GetUserIdFromToken(token);
+        var featherId = await SeedEagleFeatherAsync();
+        var uefId = await CreateUefAndGetId(featherId);
+
+        var postResp = await _client.PostAsJsonAsync($"/api/user-eagle-feathers/{uefId}/posts",
+            new { content = "achievement", imageUrl = (string?)null, organisationId = (int?)null, challengeId = (int?)null });
+        postResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var postId = (await postResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        var (rootCommentId, replyId, replyOfReplyId) = await SeedCommentThreadOnPostAsync(postId, userId);
+        await SeedLikesAsync(userId, (LikeableType.Posts, postId), (LikeableType.Comments, rootCommentId), (LikeableType.Comments, replyOfReplyId));
+
+        var response = await _client.DeleteAsync($"/api/posts/{postId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Posts.AnyAsync(p => p.Id == postId)).Should().BeFalse();
+        (await db.Comments.AnyAsync(c => c.Id == rootCommentId || c.Id == replyId || c.Id == replyOfReplyId)).Should().BeFalse();
+        (await db.Likes.AnyAsync(l => l.LikeableType == LikeableType.Posts && l.LikeableId == postId)).Should().BeFalse();
+        (await db.Likes.AnyAsync(l => l.LikeableType == LikeableType.Comments
+            && (l.LikeableId == rootCommentId || l.LikeableId == replyOfReplyId))).Should().BeFalse();
+    }
+
     // =====================
     // POST /api/user-eagle-feathers/{id}/retry
     // =====================
@@ -466,5 +530,42 @@ public class UserEagleFeathersApiTests : ApiTestBase
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         _client.DefaultRequestHeaders.Authorization = previous;
         return body.GetProperty("id").GetInt32();
+    }
+
+    // Seeds a 3-level comment thread on a Post directly via the DbContext (Comments API is
+    // owned by another agent working in parallel and may not be ready yet).
+    private async Task<(int RootId, int ReplyId, int ReplyOfReplyId)> SeedCommentThreadOnPostAsync(int postId, int authorUserId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var root = new Comment { UserId = authorUserId, CommentableType = CommentableType.Posts, CommentableId = postId, Content = "root comment", CreatedAt = DateTime.UtcNow };
+        db.Comments.Add(root);
+        await db.SaveChangesAsync();
+
+        var reply = new Comment { UserId = authorUserId, CommentableType = CommentableType.Comments, CommentableId = root.Id, Content = "reply", CreatedAt = DateTime.UtcNow };
+        db.Comments.Add(reply);
+        await db.SaveChangesAsync();
+
+        var replyOfReply = new Comment { UserId = authorUserId, CommentableType = CommentableType.Comments, CommentableId = reply.Id, Content = "reply of reply", CreatedAt = DateTime.UtcNow };
+        db.Comments.Add(replyOfReply);
+        await db.SaveChangesAsync();
+
+        return (root.Id, reply.Id, replyOfReply.Id);
+    }
+
+    // Seeds Like rows directly via the DbContext (Likes API is owned by another agent working
+    // in parallel and may not be ready yet).
+    private async Task SeedLikesAsync(int userId, params (LikeableType Type, int Id)[] targets)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        foreach (var (type, id) in targets)
+        {
+            db.Likes.Add(new Like { UserId = userId, LikeableType = type, LikeableId = id, CreatedAt = DateTime.UtcNow });
+        }
+
+        await db.SaveChangesAsync();
     }
 }

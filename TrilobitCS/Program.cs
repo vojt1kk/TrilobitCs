@@ -120,6 +120,9 @@ try
     });
 
     // Rate limiting for auth endpoints — per-IP, 5 requests per minute, disabled in testing.
+    // Rate limiting for social write endpoints (follow/like/comment) — per-IP, 30 requests per
+    // minute, disabled in testing. Partitioned by IP (not user id) because UseRateLimiter() runs
+    // before UseAuthentication() in the pipeline, so httpContext.User has no claims yet at this point.
     if (!builder.Environment.IsEnvironment("Testing"))
     {
         builder.Services.AddRateLimiter(options =>
@@ -130,6 +133,15 @@ try
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+            options.AddPolicy("social", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                     }));

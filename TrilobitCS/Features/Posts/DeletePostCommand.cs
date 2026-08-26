@@ -1,6 +1,9 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
+using TrilobitCS.Features.Shared;
+using TrilobitCS.Models;
 
 namespace TrilobitCS.Features.Posts;
 
@@ -26,6 +29,19 @@ public class DeletePostHandler : IRequestHandler<DeletePostCommand>
         var uef = await _db.UserEagleFeathers.FindAsync([post.UserEagleFeatherId], cancellationToken);
         if (uef is not null)
             uef.IsCompleted = false;
+
+        var topLevelCommentIds = await _db.Comments
+            .Where(c => c.CommentableType == CommentableType.Posts && c.CommentableId == post.Id)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+        var descendantCommentIds = await CommentCascadeHelper.CollectDescendantCommentIdsAsync(_db, topLevelCommentIds, cancellationToken);
+        var allCommentIds = topLevelCommentIds.Concat(descendantCommentIds).ToList();
+        await CommentCascadeHelper.CascadeDeleteCommentsAndLikesAsync(_db, allCommentIds, cancellationToken);
+
+        var postLikes = await _db.Likes
+            .Where(l => l.LikeableType == LikeableType.Posts && l.LikeableId == post.Id)
+            .ToListAsync(cancellationToken);
+        _db.Likes.RemoveRange(postLikes);
 
         _db.Posts.Remove(post);
         await _db.SaveChangesAsync(cancellationToken);

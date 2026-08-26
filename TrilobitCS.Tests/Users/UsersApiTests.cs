@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrilobitCS.Data;
+using TrilobitCS.Models;
 using TrilobitCS.Requests;
 using TrilobitCS.Tests.Factories;
 using Xunit;
@@ -195,6 +196,149 @@ public class UsersApiTests : ApiTestBase
         var response = await _client.DeleteAsync("/api/user");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task DeleteUser_WithFollowersBothWays_Returns204()
+    {
+        // Regression test: Follower.FollowingUser FK is Restrict, so deleting a user who has
+        // followers would previously 500 without the Followers cleanup in DeleteUserHandler.
+        var userA = RegisterRequestFactory.Make();
+        var tokenA = await RegisterAndGetToken(userA);
+        var userIdA = ExtractUserIdFromJwt(tokenA);
+
+        var userB = RegisterRequestFactory.Make();
+        var tokenB = await RegisterAndGetToken(userB);
+        var userIdB = ExtractUserIdFromJwt(tokenB);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // B follows A (A is followed) and A follows B (A is a follower).
+            db.Followers.Add(new Follower { FollowerId = userIdB, FollowingId = userIdA, CreatedAt = DateTime.UtcNow });
+            db.Followers.Add(new Follower { FollowerId = userIdA, FollowingId = userIdB, CreatedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+        }
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenA);
+        var response = await _client.DeleteAsync("/api/user");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await verifyDb.Users.AnyAsync(u => u.Id == userIdA)).Should().BeFalse();
+        (await verifyDb.Followers.AnyAsync(f => f.FollowerId == userIdA || f.FollowingId == userIdA)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteUser_WithPostsLikedAndCommentedByOthers_Returns204NoOrphans()
+    {
+        var owner = RegisterRequestFactory.Make();
+        var ownerToken = await RegisterAndGetToken(owner);
+        var ownerId = ExtractUserIdFromJwt(ownerToken);
+
+        var otherToken = await RegisterAndGetToken();
+        var otherId = ExtractUserIdFromJwt(otherToken);
+
+        int postId;
+        int commentId;
+        int replyId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            postId = await SeedPostForUserAsync(db, ownerId);
+
+            var comment = new Comment { UserId = otherId, CommentableType = CommentableType.Posts, CommentableId = postId, Content = "nice job", CreatedAt = DateTime.UtcNow };
+            db.Comments.Add(comment);
+            await db.SaveChangesAsync();
+
+            var reply = new Comment { UserId = otherId, CommentableType = CommentableType.Comments, CommentableId = comment.Id, Content = "agreed", CreatedAt = DateTime.UtcNow };
+            db.Comments.Add(reply);
+            db.Likes.Add(new Like { UserId = otherId, LikeableType = LikeableType.Posts, LikeableId = postId, CreatedAt = DateTime.UtcNow });
+            db.Likes.Add(new Like { UserId = otherId, LikeableType = LikeableType.Comments, LikeableId = comment.Id, CreatedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+            commentId = comment.Id;
+            replyId = reply.Id;
+        }
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var response = await _client.DeleteAsync("/api/user");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await verifyDb.Users.AnyAsync(u => u.Id == ownerId)).Should().BeFalse();
+        (await verifyDb.Posts.AnyAsync(p => p.Id == postId)).Should().BeFalse();
+        (await verifyDb.Comments.AnyAsync(c => c.CommentableType == CommentableType.Posts && c.CommentableId == postId)).Should().BeFalse();
+        (await verifyDb.Comments.AnyAsync(c => c.Id == replyId)).Should().BeFalse();
+        (await verifyDb.Likes.AnyAsync(l => l.LikeableType == LikeableType.Posts && l.LikeableId == postId)).Should().BeFalse();
+        (await verifyDb.Likes.AnyAsync(l => l.LikeableType == LikeableType.Comments && l.LikeableId == commentId)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteUser_WithOwnCommentLikedByOther_Returns204NoOrphanedLike()
+    {
+        var owner = RegisterRequestFactory.Make();
+        var ownerToken = await RegisterAndGetToken(owner);
+        var ownerId = ExtractUserIdFromJwt(ownerToken);
+
+        var otherToken = await RegisterAndGetToken();
+        var otherId = ExtractUserIdFromJwt(otherToken);
+
+        int ownCommentId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var postId = await SeedPostForUserAsync(db, ownerId);
+
+            var ownComment = new Comment { UserId = ownerId, CommentableType = CommentableType.Posts, CommentableId = postId, Content = "my own comment", CreatedAt = DateTime.UtcNow };
+            db.Comments.Add(ownComment);
+            await db.SaveChangesAsync();
+
+            db.Likes.Add(new Like { UserId = otherId, LikeableType = LikeableType.Comments, LikeableId = ownComment.Id, CreatedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+            ownCommentId = ownComment.Id;
+        }
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        var response = await _client.DeleteAsync("/api/user");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await verifyDb.Comments.AnyAsync(c => c.Id == ownCommentId)).Should().BeFalse();
+        (await verifyDb.Likes.AnyAsync(l => l.LikeableType == LikeableType.Comments && l.LikeableId == ownCommentId)).Should().BeFalse();
+    }
+
+    // Seeds an EagleFeather + UserEagleFeather + Post directly via the DbContext for the given
+    // user, so DeleteUser cascade tests don't need to go through the full UEF/Post HTTP flow.
+    private static async Task<int> SeedPostForUserAsync(AppDbContext db, int userId)
+    {
+        var feather = new EagleFeather
+        {
+            Light = 1,
+            Section = $"T{Guid.NewGuid():N}"[..10],
+            Number = 1,
+            Name = "Test pero",
+            Challenge = "cin",
+            GrandChallenge = "velky cin",
+            SourceUrl = "https://example.com",
+        };
+        db.EagleFeathers.Add(feather);
+        await db.SaveChangesAsync();
+
+        var uef = new UserEagleFeather { UserId = userId, EagleFeatherId = feather.Id, CreatedAt = DateTime.UtcNow };
+        db.UserEagleFeathers.Add(uef);
+        await db.SaveChangesAsync();
+
+        var post = new Post { UserId = userId, UserEagleFeatherId = uef.Id, Content = "achievement", CreatedAt = DateTime.UtcNow };
+        db.Posts.Add(post);
+        await db.SaveChangesAsync();
+
+        return post.Id;
     }
 
     private static int ExtractUserIdFromJwt(string jwt)

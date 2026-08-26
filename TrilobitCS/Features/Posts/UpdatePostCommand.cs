@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
+using TrilobitCS.Models;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
 
@@ -41,8 +42,8 @@ public class UpdatePostHandler : IRequestHandler<UpdatePostCommand, PostResponse
                 p.ImageUrl,
                 p.UserEagleFeatherId,
                 p.ChallengeId,
-                0,
-                0,
+                _db.Likes.Count(l => l.LikeableType == LikeableType.Posts && l.LikeableId == p.Id),
+                _db.Comments.Count(c => c.CommentableType == CommentableType.Posts && c.CommentableId == p.Id),
                 p.CreatedAt
             ))
             .FirstAsync(cancellationToken);
