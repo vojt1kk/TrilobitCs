@@ -443,6 +443,15 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
 ```
 Status: `0` = Pending, `1` = Accepted, `2` = Declined
 
+### Feed (`/api/feed`, `/api/organisations/{id}/feed`)
+
+| Method | Path | Auth | Response | Popis |
+|---|---|---|---|---|
+| GET | `/api/feed` | ano | `PagedResponse<PostResponse>` (200) | Osobní feed: moje posty + posty sledovaných uživatelů (bez ohledu na `organisationId`), řazeno `createdAt DESC` |
+| GET | `/api/organisations/{id}/feed` | ano | `PagedResponse<PostResponse>` (200) | Všechny posty publikované do dané organizace (`organisationId == id`), řazeno `createdAt DESC`. Přístupné komukoli přihlášenému, bez kontroly členství (na rozdíl od Announcements) |
+
+Obě vrací stejný `PostResponse` tvar jako `GET /api/posts/{id}` (viz níže).
+
 ### Posts (`/api/user-eagle-feathers/{uefId}/posts`, `/api/posts`)
 
 | Method | Path | Auth | Request body | Response | Popis |
@@ -521,6 +530,40 @@ Schvalovat/zamítat smí **kterýkoli Leader** (`role = Leader`), bez vazby na o
 ```
 Status: `0` = Pending, `1` = Approved, `2` = Rejected (serializováno jako int).
 
+### Announcements (`/api/organisations/{id}/announcements`, `/api/announcements`)
+
+Oznámení organizace. Vytváří/upravuje/maže jen Leader dané organizace, číst (paged) smí jen její členové.
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/organisations/{id}/announcements` | Leader dané org | `CreateAnnouncementRequest` | `AnnouncementResponse` (201) | Vytvoří announcement. 403 pokud caller není Leader dané org, 404 pro neexistující org, 422 pro validaci |
+| GET | `/api/organisations/{id}/announcements` | člen dané org | — | `PagedResponse<AnnouncementResponse>` (200) | Announcements organizace, řazeno `createdAt DESC`. 403 pokud caller není členem (`user.organisationId == id`), 404 pro neexistující org |
+| PUT | `/api/announcements/{id}` | Leader dané org | `UpdateAnnouncementRequest` | `AnnouncementResponse` (200) | Aktualizace (patch-style, alespoň jedno pole). Nastaví `updatedAt`. 403/404 jako výše |
+| DELETE | `/api/announcements/{id}` | Leader dané org | — | 204 No Content | Hard delete. 403/404 jako výše |
+
+**CreateAnnouncementRequest:**
+```json
+{ "title": "string (max 60, required)", "content": "string (max 300, required)" }
+```
+
+**UpdateAnnouncementRequest** — obě pole optional, alespoň jedno vyplněné:
+```json
+{ "title": "string? (max 60)", "content": "string? (max 300)" }
+```
+
+**AnnouncementResponse:**
+```json
+{
+  "id": 1,
+  "organisationId": 2,
+  "title": "Brigáda o víkendu",
+  "content": "...",
+  "createdBy": { "id": 3, "nickname": "vedouci123" },
+  "createdAt": "2026-08-26T...",
+  "updatedAt": null
+}
+```
+
 ---
 
 ## Databázové schéma (kompletní)
@@ -581,6 +624,16 @@ organisation_invites
   declined_at     timestamp    (nullable — nastaveno handlerem při Decline)
   created_at      timestamp    DEFAULT now()
   UNIQUE(invited_user_id, organisation_id, declined_at)  -- PostgreSQL NULL!=NULL: pending (declined_at=NULL) koexistuje s declined (declined_at!=NULL)
+
+announcements
+  id              PK
+  organisation_id FK → organisations.id (Cascade delete)
+  title           varchar(60)  NOT NULL
+  content         varchar(300) NOT NULL
+  created_by_id   FK → users.id (Restrict on delete)
+  created_at      timestamp
+  updated_at      timestamp (nullable — nastaveno jen při update)
+  INDEX(organisation_id)
 
 -- MODELY EXISTUJÍ, API ZATÍM NEIMPLEMENTOVÁNO
 followers

@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<OrganisationInvite> OrganisationInvites => Set<OrganisationInvite>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -177,6 +178,23 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(i => i.InvitedById)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Announcement>(entity =>
+        {
+            entity.Property(a => a.Title).HasMaxLength(60);
+            entity.Property(a => a.Content).HasMaxLength(300);
+            entity.HasIndex(a => a.OrganisationId);
+
+            entity.HasOne(a => a.Organisation)
+                .WithMany()
+                .HasForeignKey(a => a.OrganisationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(a => a.CreatedBy)
+                .WithMany()
+                .HasForeignKey(a => a.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
