@@ -53,4 +53,39 @@ public class EagleFeathersController : ControllerBase
 
         return Ok(EagleFeatherResponse.FromModel(feather));
     }
+
+    /// <summary>Get all distinct light levels for scraped eagle feathers</summary>
+    /// <response code="200">Returns the list of light levels</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("lights")]
+    [EndpointName("getEagleFeatherLights")]
+    [ProducesResponseType(typeof(int[]), 200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> Lights(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetEagleFeatherLightsQuery(), ct));
+
+    /// <summary>Get all sections within a given light</summary>
+    /// <param name="light">Light level</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <response code="200">Returns the list of sections</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("lights/{light:int}/sections")]
+    [EndpointName("getEagleFeatherSections")]
+    [ProducesResponseType(typeof(string[]), 200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> Sections(byte light, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetEagleFeatherSectionsQuery(light), ct));
+
+    /// <summary>Get individual eagle feathers within a given section</summary>
+    /// <param name="light">Light level</param>
+    /// <param name="section">Section code</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <response code="200">Returns the eagle feathers in the section</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("lights/{light:int}/sections/{section}")]
+    [EndpointName("getEagleFeathersBySection")]
+    [ProducesResponseType(typeof(EagleFeatherResponse[]), 200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> FeathersBySection(byte light, string section, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetEagleFeathersBySectionQuery(light, section), ct));
 }

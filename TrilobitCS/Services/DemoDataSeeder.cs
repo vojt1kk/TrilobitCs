@@ -21,6 +21,8 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
 
     private sealed record OrgSpec(string Name, string Description);
 
+    private sealed record AnnouncementSpec(int OrgIndex, string Title, string Content);
+
     private sealed record FeatherAssignmentSpec(
         string UserNickname, int FeatherIndex, bool IsGrandChallenge,
         EagleFeatherStatus Status, string? VerifiedByNickname, string? ModeratorNote);
@@ -60,11 +62,20 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
         new("seed08", 0, true, EagleFeatherStatus.Rejected, "seed02", "[seed] Potřeba doplnit fotky."),
     ];
 
+    private static readonly AnnouncementSpec[] AnnouncementSpecs =
+    [
+        new(0, "[seed] Schůzka oddílu", "Příští schůzka bude ve čtvrtek v klubovně."),
+        new(0, "[seed] Brigáda na základně", "Prosíme o účast na jarní brigádě, přineste rukavice."),
+        new(1, "[seed] Letní tábor", "Přihlášky na letní tábor spouštíme od pondělí."),
+        new(1, "[seed] Změna programu", "Sobotní výprava se přesouvá na neděli kvůli počasí."),
+    ];
+
     public async Task SeedAsync(CancellationToken ct)
     {
         var users = await SeedUsersAsync(ct);
         var orgs = await SeedOrganisationsAsync(users, ct);
         await SyncUserOrganisationsAsync(users, orgs, ct);
+        await SeedAnnouncementsAsync(users, orgs, ct);
         await SeedFollowersAsync(users, ct);
         var approvedUefs = await SeedUserEagleFeathersAsync(users, ct);
         await SeedPostsWithEngagementAsync(users, approvedUefs, ct);
@@ -149,6 +160,39 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
     {
         foreach (var spec in UserSpecs)
             users[spec.Nickname].OrganisationId = orgs[spec.OrgIndex].Id;
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedAnnouncementsAsync(Dictionary<string, User> users, Organisation[] orgs, CancellationToken ct)
+    {
+        var orgIds = orgs.Select(o => o.Id).ToArray();
+        var titles = AnnouncementSpecs.Select(s => s.Title).ToArray();
+        var existing = await db.Announcements
+            .Where(a => orgIds.Contains(a.OrganisationId) && titles.Contains(a.Title))
+            .ToDictionaryAsync(a => (a.OrganisationId, a.Title), ct);
+
+        foreach (var spec in AnnouncementSpecs)
+        {
+            var org = orgs[spec.OrgIndex];
+            var leaderNickname = UserSpecs.First(u => u.IsLeader && u.OrgIndex == spec.OrgIndex).Nickname;
+            var leader = users[leaderNickname];
+
+            if (existing.TryGetValue((org.Id, spec.Title), out var announcement))
+            {
+                announcement.Content = spec.Content;
+                continue;
+            }
+
+            db.Announcements.Add(new Announcement
+            {
+                OrganisationId = org.Id,
+                Title = spec.Title,
+                Content = spec.Content,
+                CreatedById = leader.Id,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
 
         await db.SaveChangesAsync(ct);
     }
@@ -248,18 +292,38 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
             .Where(f => approvedUefs.Select(u => u.EagleFeatherId).Contains(f.Id))
             .ToDictionaryAsync(f => f.Id, ct);
 
-        foreach (var uef in approvedUefs)
+        var orgPostCounts = new Dictionary<int, int>();
+
+        for (var i = 0; i < approvedUefs.Count; i++)
         {
+            var uef = approvedUefs[i];
             uef.IsCompleted = true;
 
-            if (existingPosts.TryGetValue(uef.Id, out var post)) continue;
-
             var author = users.Values.First(u => u.Id == uef.UserId);
+
+            // Every organisation's first post always joins that org's feed (guarantees non-empty
+            // org feeds even for orgs with few posts); subsequent posts from the same org
+            // alternate out, giving a realistic mix with /api/feed (follower-based, no org).
+            int? organisationId = null;
+            if (author.OrganisationId is int orgId)
+            {
+                var postIndexInOrg = orgPostCounts.GetValueOrDefault(orgId);
+                orgPostCounts[orgId] = postIndexInOrg + 1;
+                organisationId = postIndexInOrg % 2 == 0 ? orgId : null;
+            }
+
+            if (existingPosts.TryGetValue(uef.Id, out var existingPost))
+            {
+                existingPost.OrganisationId = organisationId;
+                continue;
+            }
+
             var feather = feathersById[uef.EagleFeatherId];
 
-            post = new Post
+            var post = new Post
             {
                 UserId = author.Id,
+                OrganisationId = organisationId,
                 UserEagleFeatherId = uef.Id,
                 Content = $"{ContentTag} {author.FirstName} splnil/a čin \"{feather.Name}\".",
                 CreatedAt = DateTime.UtcNow,
