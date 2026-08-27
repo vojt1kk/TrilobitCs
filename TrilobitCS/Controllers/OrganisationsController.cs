@@ -75,4 +75,18 @@ public class OrganisationsController : ControllerBase
     [ProducesResponseType(422)]
     public async Task<IActionResult> Members(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
         => Ok(await _mediator.Send(new GetOrganisationMembersQuery(id, pagination), ct));
+
+    /// <summary>Returns all posts published within an organisation (paginated, any authenticated user)</summary>
+    /// <response code="200">Feed page</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Organisation not found</response>
+    /// <response code="422">Invalid pagination parameters</response>
+    [HttpGet("api/organisations/{id:int}/feed")]
+    [EndpointName("getOrganisationFeed")]
+    [ProducesResponseType(typeof(PagedResponse<PostResponse>), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> Feed(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOrganisationFeedQuery(id, pagination), ct));
 }
