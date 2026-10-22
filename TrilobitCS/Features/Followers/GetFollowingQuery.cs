@@ -1,13 +1,12 @@
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
-using TrilobitCS.Exceptions;
+using TrilobitCS.Features.Shared;
 using TrilobitCS.Pagination;
 using TrilobitCS.Responses;
 
 namespace TrilobitCS.Features.Followers;
 
-public record GetFollowingQuery(int UserId, PaginationQuery Pagination) : IRequest<PagedResponse<PublicUserResponse>>;
+public record GetFollowingQuery(int UserId, int ViewerId, PaginationQuery Pagination) : IRequest<PagedResponse<PublicUserResponse>>;
 
 public class GetFollowingHandler : IRequestHandler<GetFollowingQuery, PagedResponse<PublicUserResponse>>
 {
@@ -20,8 +19,7 @@ public class GetFollowingHandler : IRequestHandler<GetFollowingQuery, PagedRespo
 
     public async Task<PagedResponse<PublicUserResponse>> Handle(GetFollowingQuery query, CancellationToken cancellationToken)
     {
-        if (!await _db.Users.AnyAsync(u => u.Id == query.UserId, cancellationToken))
-            throw new NotFoundException("errors.user_not_found");
+        await PrivacyGuard.EnsureProfileVisibleAsync(_db, query.ViewerId, query.UserId, cancellationToken);
 
         // ToPagedResponseAsync applies its selector in-memory after ToListAsync, so it cannot
         // traverse an un-loaded navigation property — project FollowingUser server-side first.

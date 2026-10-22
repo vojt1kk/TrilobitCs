@@ -2,6 +2,8 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
+using TrilobitCS.Features.Shared;
+using TrilobitCS.Models;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
 
@@ -24,7 +26,13 @@ public class UpdateCommentHandler : IRequestHandler<UpdateCommentCommand, Commen
             ?? throw new NotFoundException("errors.comment_not_found");
 
         if (comment.UserId != command.UserId)
+        {
+            // Hidden (or orphaned) comments must look identical to missing ones
+            var rootPostId = await PrivacyGuard.ResolveRootPostIdAsync(_db, CommentableType.Comments, comment.Id, cancellationToken);
+            if (rootPostId is null || !await PrivacyGuard.IsPostVisibleAsync(_db, command.UserId, rootPostId.Value, cancellationToken))
+                throw new NotFoundException("errors.comment_not_found");
             throw new ForbiddenException("errors.forbidden");
+        }
 
         comment.Content = command.Request.Content;
 

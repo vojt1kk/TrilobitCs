@@ -151,6 +151,9 @@ try
 
     builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
+    if (!builder.Environment.IsEnvironment("Testing"))
+        builder.Services.AddHostedService<WeeklyChallengeRotationService>();
+
     // Demo/staging only: periodically seeds a deterministic set of users, orgs, posts, comments
     // and likes so the database (e.g. a Supabase instance) always has something to return.
     if (builder.Configuration.GetValue<bool>("DemoSeeding:Enabled") && !builder.Environment.IsEnvironment("Testing"))

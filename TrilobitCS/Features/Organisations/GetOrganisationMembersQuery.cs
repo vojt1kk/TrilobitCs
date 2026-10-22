@@ -7,7 +7,7 @@ using TrilobitCS.Responses;
 
 namespace TrilobitCS.Features.Organisations;
 
-public record GetOrganisationMembersQuery(int OrganisationId, PaginationQuery Pagination) : IRequest<PagedResponse<OrganisationMemberResponse>>;
+public record GetOrganisationMembersQuery(int OrganisationId, int ViewerId, PaginationQuery Pagination) : IRequest<PagedResponse<OrganisationMemberResponse>>;
 
 public class GetOrganisationMembersHandler : IRequestHandler<GetOrganisationMembersQuery, PagedResponse<OrganisationMemberResponse>>
 {
@@ -26,9 +26,9 @@ public class GetOrganisationMembersHandler : IRequestHandler<GetOrganisationMemb
         return await _db.Users
             .Where(u => u.OrganisationId == query.OrganisationId)
             .OrderBy(u => u.Id)
-            .ToPagedResponseAsync(
-                query.Pagination,
-                u => new OrganisationMemberResponse(u.Id, u.Nickname, u.FirstName, u.LastName, u.ProfilePicture, u.Role, u.CreatedAt),
-                cancellationToken);
+            .Select(u => new OrganisationMemberResponse(
+                u.Id, u.Nickname, u.FirstName, u.LastName, u.ProfilePicture, u.Role, u.CreatedAt,
+                u.Followers.Any(f => f.FollowerId == query.ViewerId)))
+            .ToPagedResponseAsync(query.Pagination, x => x, cancellationToken);
     }
 }

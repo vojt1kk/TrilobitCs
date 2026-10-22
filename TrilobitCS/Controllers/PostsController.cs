@@ -29,12 +29,12 @@ public class PostsController : ControllerBase
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> Get(int id, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetPostQuery(id), ct));
+        => Ok(await _mediator.Send(new GetPostQuery(id, User.GetUserId()), ct));
 
     /// <summary>Create a new post for a user eagle feather</summary>
     /// <response code="200">Created post</response>
     /// <response code="401">Unauthorized</response>
-    /// <response code="403">UserEagleFeather does not belong to the authenticated user</response>
+    /// <response code="403">UserEagleFeather does not belong to the authenticated user, or the author is not a member of OrganisationId</response>
     /// <response code="404">UserEagleFeatherId or OrganisationId not found</response>
     /// <response code="422">Content and imageUrl both missing</response>
     [HttpPost("api/user-eagle-feathers/{uefId:int}/posts")]

@@ -12,6 +12,7 @@ public class User
     public DateOnly BirthDate { get; set; }
     public string? ProfilePicture { get; set; }
     public UserRole Role { get; set; } = UserRole.User;
+    public bool IsPrivate { get; set; }
     public int? OrganisationId { get; set; }
     public Organisation? Organisation { get; set; }
     public DateTime CreatedAt { get; set; }

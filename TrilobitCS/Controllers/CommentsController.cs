@@ -49,7 +49,7 @@ public class CommentsController : ControllerBase
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> GetForPost(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetCommentsQuery(CommentableType.Posts, id, pagination), ct));
+        => Ok(await _mediator.Send(new GetCommentsQuery(User.GetUserId(), CommentableType.Posts, id, pagination), ct));
 
     /// <summary>Create a reply to a comment</summary>
     /// <response code="200">Created comment</response>
@@ -78,7 +78,7 @@ public class CommentsController : ControllerBase
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> GetForComment(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetCommentsQuery(CommentableType.Comments, id, pagination), ct));
+        => Ok(await _mediator.Send(new GetCommentsQuery(User.GetUserId(), CommentableType.Comments, id, pagination), ct));
 
     /// <summary>Update own comment</summary>
     /// <response code="200">Updated comment</response>

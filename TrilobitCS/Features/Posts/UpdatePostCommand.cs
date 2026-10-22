@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TrilobitCS.Data;
 using TrilobitCS.Exceptions;
+using TrilobitCS.Features.Shared;
 using TrilobitCS.Models;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
@@ -25,7 +26,12 @@ public class UpdatePostHandler : IRequestHandler<UpdatePostCommand, PostResponse
             ?? throw new NotFoundException("errors.post_not_found");
 
         if (post.UserId != command.UserId)
+        {
+            // Hidden posts must look identical to missing ones
+            if (!await PrivacyGuard.IsPostVisibleAsync(_db, command.UserId, post.Id, cancellationToken))
+                throw new NotFoundException("errors.post_not_found");
             throw new ForbiddenException("errors.forbidden");
+        }
 
         post.Content = command.Request.Content;
         post.ImageUrl = command.Request.ImageUrl;

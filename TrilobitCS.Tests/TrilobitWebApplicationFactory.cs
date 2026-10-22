@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
+using TrilobitCS.Tests.Infrastructure;
 using TrilobitCS.Data;
 using Xunit;
 
@@ -15,6 +16,9 @@ public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAs
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .Build();
+
+    // Inactive unless a test calls Start(); see CommandCountingInterceptor.
+    public CommandCountingInterceptor CommandCounter { get; } = new();
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
 
@@ -47,7 +51,8 @@ public class TrilobitWebApplicationFactory : WebApplicationFactory<Program>, IAs
             if (descriptor != null) services.Remove(descriptor);
 
             services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(_postgres.GetConnectionString()));
+                options.UseNpgsql(_postgres.GetConnectionString())
+                    .AddInterceptors(CommandCounter));
         });
     }
 }

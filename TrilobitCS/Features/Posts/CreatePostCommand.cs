@@ -32,6 +32,20 @@ public class CreatePostHandler : IRequestHandler<CreatePostCommand, PostResponse
             && !await _db.Organisations.AnyAsync(o => o.Id == req.OrganisationId.Value, cancellationToken))
             throw new NotFoundException("errors.organisation_not_found");
 
+        if (req.OrganisationId is not null)
+        {
+            var authorOrgId = await _db.Users
+                .Where(u => u.Id == command.UserId)
+                .Select(u => u.OrganisationId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (authorOrgId != req.OrganisationId)
+                throw new ForbiddenException("errors.not_organisation_member");
+        }
+
+        if (req.ChallengeId is not null
+            && !await _db.Challenges.AnyAsync(c => c.Id == req.ChallengeId.Value, cancellationToken))
+            throw new NotFoundException("errors.challenge_not_found");
+
         var post = new Post
         {
             UserId = command.UserId,

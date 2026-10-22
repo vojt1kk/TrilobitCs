@@ -1,0 +1,43 @@
+using MediatR;
+using TrilobitCS.Data;
+using TrilobitCS.Features.Shared;
+using TrilobitCS.Models;
+using TrilobitCS.Pagination;
+using TrilobitCS.Responses;
+
+namespace TrilobitCS.Features.Users;
+
+public record GetUserPostsQuery(int UserId, int ViewerId, PaginationQuery Pagination) : IRequest<PagedResponse<PostResponse>>;
+
+public class GetUserPostsHandler : IRequestHandler<GetUserPostsQuery, PagedResponse<PostResponse>>
+{
+    private readonly AppDbContext _db;
+
+    public GetUserPostsHandler(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task<PagedResponse<PostResponse>> Handle(GetUserPostsQuery query, CancellationToken cancellationToken)
+    {
+        await PrivacyGuard.EnsureProfileVisibleAsync(_db, query.ViewerId, query.UserId, cancellationToken);
+
+        // Identity selector + Id tiebreaker: same rationale as GetPersonalFeedQuery.
+        return await _db.Posts
+            .Where(p => p.UserId == query.UserId)
+            .OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .Select(p => new PostResponse(
+                p.Id,
+                new PostAuthorResponse(p.User.Id, p.User.Nickname, p.User.ProfilePicture),
+                p.OrganisationId,
+                p.Content,
+                p.ImageUrl,
+                p.UserEagleFeatherId,
+                p.ChallengeId,
+                _db.Likes.Count(l => l.LikeableType == LikeableType.Posts && l.LikeableId == p.Id),
+                _db.Comments.Count(c => c.CommentableType == CommentableType.Posts && c.CommentableId == p.Id),
+                p.CreatedAt
+            ))
+            .ToPagedResponseAsync(query.Pagination, x => x, cancellationToken);
+    }
+}

@@ -9,5 +9,6 @@ public record OrganisationMemberResponse(
     string LastName,
     string? ProfilePicture,
     UserRole Role,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    bool IsFollowing
 );

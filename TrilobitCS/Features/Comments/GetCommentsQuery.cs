@@ -9,7 +9,7 @@ using TrilobitCS.Responses;
 
 namespace TrilobitCS.Features.Comments;
 
-public record GetCommentsQuery(CommentableType Type, int TargetId, PaginationQuery Pagination) : IRequest<PagedResponse<CommentResponse>>;
+public record GetCommentsQuery(int ViewerId, CommentableType Type, int TargetId, PaginationQuery Pagination) : IRequest<PagedResponse<CommentResponse>>;
 
 public class GetCommentsHandler : IRequestHandler<GetCommentsQuery, PagedResponse<CommentResponse>>
 {
@@ -23,6 +23,11 @@ public class GetCommentsHandler : IRequestHandler<GetCommentsQuery, PagedRespons
     public async Task<PagedResponse<CommentResponse>> Handle(GetCommentsQuery query, CancellationToken cancellationToken)
     {
         if (!await PolymorphicTargetHelper.CommentableTargetExistsAsync(_db, query.Type, query.TargetId, cancellationToken))
+            throw new NotFoundException("errors.commentable_target_not_found");
+
+        // Hidden posts reuse the "not found" key so they are indistinguishable from missing ones.
+        var rootPostId = await PrivacyGuard.ResolveRootPostIdAsync(_db, query.Type, query.TargetId, cancellationToken);
+        if (rootPostId is null || !await PrivacyGuard.IsPostVisibleAsync(_db, query.ViewerId, rootPostId.Value, cancellationToken))
             throw new NotFoundException("errors.commentable_target_not_found");
 
         // Selector below runs in-memory after ToListAsync (ToPagedResponseAsync applies it post-materialization),

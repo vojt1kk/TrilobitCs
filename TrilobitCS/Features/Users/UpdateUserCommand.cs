@@ -35,21 +35,14 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserCommand, UserMeRespon
         user.Gender = request.Gender;
         user.BirthDate = request.BirthDate;
         user.ProfilePicture = request.ProfilePicture;
+        if (request.IsPrivate.HasValue)
+            user.IsPrivate = request.IsPrivate.Value;
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        return new UserMeResponse(
-            user.Id,
-            user.Nickname,
-            user.FirstName,
-            user.LastName,
-            user.Email,
-            user.Gender,
-            user.BirthDate,
-            user.ProfilePicture,
-            user.Role,
-            user.OrganisationId,
-            user.CreatedAt
-        );
+        return await _db.Users
+            .Where(u => u.Id == user.Id)
+            .Select(GetCurrentUserHandler.Projection)
+            .FirstAsync(cancellationToken);
     }
 }

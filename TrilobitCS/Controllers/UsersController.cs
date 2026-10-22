@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TrilobitCS.Extensions;
 using TrilobitCS.Features.Users;
+using TrilobitCS.Pagination;
 using TrilobitCS.Requests;
 using TrilobitCS.Responses;
 
@@ -19,17 +20,63 @@ public class UsersController : ControllerBase
         _mediator = mediator;
     }
 
-    /// <summary>Returns the public profile of a user (without email)</summary>
+    /// <summary>Returns the profile of a user (without email); counts are null for private profiles the caller does not follow</summary>
     /// <response code="200">Public user profile</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="404">User not found</response>
     [HttpGet("api/users/{id:int}")]
     [EndpointName("getUser")]
-    [ProducesResponseType(typeof(PublicUserResponse), 200)]
+    [ProducesResponseType(typeof(UserProfileResponse), 200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> Show(int id, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetUserQuery(id), ct));
+        => Ok(await _mediator.Send(new GetUserQuery(id, User.GetUserId()), ct));
+
+    /// <summary>Returns a user's posts (paginated; private profiles only to followers)</summary>
+    /// <response code="200">Posts page</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">Profile is private and the caller does not follow the user</response>
+    /// <response code="404">User not found</response>
+    /// <response code="422">Invalid pagination parameters</response>
+    [HttpGet("api/users/{id:int}/posts")]
+    [EndpointName("getUserPosts")]
+    [ProducesResponseType(typeof(PagedResponse<PostResponse>), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> Posts(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetUserPostsQuery(id, User.GetUserId(), pagination), ct));
+
+    /// <summary>Returns a user's eagle feathers (paginated; all statuses for self, Approved only for others)</summary>
+    /// <response code="200">User eagle feathers page</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">Profile is private and the caller does not follow the user</response>
+    /// <response code="404">User not found</response>
+    /// <response code="422">Invalid pagination parameters</response>
+    [HttpGet("api/users/{id:int}/eagle-feathers")]
+    [EndpointName("getUserEagleFeathers")]
+    [ProducesResponseType(typeof(PagedResponse<UserEagleFeatherResponse>), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(422)]
+    public async Task<IActionResult> EagleFeathers(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetUserEagleFeathersQuery(id, User.GetUserId(), pagination), ct));
+
+    /// <summary>Returns aggregate counters of a user (private profiles only to followers)</summary>
+    /// <response code="200">User stats</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">Profile is private and the caller does not follow the user</response>
+    /// <response code="404">User not found</response>
+    [HttpGet("api/users/{id:int}/stats")]
+    [EndpointName("getUserStats")]
+    [ProducesResponseType(typeof(UserStatsResponse), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Stats(int id, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetUserStatsQuery(id, User.GetUserId()), ct));
 
     /// <summary>Returns the authenticated user's own profile (with email, role, organisationId)</summary>
     /// <response code="200">Own profile</response>

@@ -28,6 +28,9 @@ public class AppDbContext : DbContext
             entity.HasIndex(u => u.Email).IsUnique();
             entity.HasIndex(u => u.Nickname).IsUnique();
 
+            entity.Property(u => u.IsPrivate)
+                .HasDefaultValue(false);
+
             entity.HasOne(u => u.Organisation)
                 .WithMany(o => o.Members)
                 .HasForeignKey(u => u.OrganisationId)

@@ -13,5 +13,10 @@ public record UserMeResponse(
     string? ProfilePicture,
     UserRole Role,
     int? OrganisationId,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    bool IsPrivate,
+    int FollowerCount,
+    int FollowingCount,
+    int ApprovedFeatherCount,
+    int PostCount
 );

@@ -61,7 +61,7 @@ public class FollowersController : ControllerBase
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> Followers(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetFollowersQuery(id, pagination), ct));
+        => Ok(await _mediator.Send(new GetFollowersQuery(id, User.GetUserId(), pagination), ct));
 
     /// <summary>Returns the list of users the given user is following (paginated)</summary>
     /// <response code="200">Following list</response>
@@ -75,5 +75,5 @@ public class FollowersController : ControllerBase
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     public async Task<IActionResult> Following(int id, [FromQuery] PaginationQuery pagination, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetFollowingQuery(id, pagination), ct));
+        => Ok(await _mediator.Send(new GetFollowingQuery(id, User.GetUserId(), pagination), ct));
 }

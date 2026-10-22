@@ -161,14 +161,14 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
 
     private static readonly ChallengeSpec[] ChallengeSpecs =
     [
-        new($"{ContentTag} Zimní výzva", "Splň libovolné pero 1. světla venku v mrazu.", 1, 20, 60),
-        new($"{ContentTag} Běžecká série", "Tři běhy během jednoho týdne.", 2, 15, 45),
-        new($"{ContentTag} Noc pod širákem", "Přespi venku bez stanu a dokumentuj to.", 3, 10, 40),
-        new($"{ContentTag} Turistický přejezd", "Ujdi 20 km v jednom dni.", 2, 30, 90),
-        new($"{ContentTag} Znalost přírody", "Pozoruj a popiš deset druhů rostlin.", 1, 5, 60),
-        new($"{ContentTag} Vodácký víkend", "Sjeď řeku na kánoi nebo raftu.", 2, 60, 30),
-        new($"{ContentTag} Řemeslná dovednost", "Vyrob si vlastní nástroj nebo ozdobu.", 1, 45, 120),
-        new($"{ContentTag} Velký čin roku", "Vyber si velký čin a dotáhni ho do konce.", 3, 90, 365),
+        new($"{ContentTag} Zimní výzva", "Splň libovolné pero 1. světla venku v mrazu.", 1, 70, 7),
+        new($"{ContentTag} Běžecká série", "Tři běhy během jednoho týdne.", 2, 63, 7),
+        new($"{ContentTag} Noc pod širákem", "Přespi venku bez stanu a dokumentuj to.", 3, 56, 7),
+        new($"{ContentTag} Turistický přejezd", "Ujdi 20 km v jednom dni.", 2, 49, 7),
+        new($"{ContentTag} Znalost přírody", "Pozoruj a popiš deset druhů rostlin.", 1, 42, 7),
+        new($"{ContentTag} Vodácký víkend", "Sjeď řeku na kánoi nebo raftu.", 2, 35, 7),
+        new($"{ContentTag} Řemeslná dovednost", "Vyrob si vlastní nástroj nebo ozdobu.", 1, 28, 7),
+        new($"{ContentTag} Velký čin roku", "Vyber si velký čin a dotáhni ho do konce.", 3, 21, 7),
     ];
 
     private static readonly string[] PostTemplates =
@@ -576,6 +576,12 @@ public class DemoDataSeeder(AppDbContext db, BcryptPasswordHasher passwordHasher
             {
                 challenge.Description = spec.Description;
                 challenge.DifficultyLevel = spec.DifficultyLevel;
+                // Seeded challenges are historic; only legacy still-active rows are rewritten so the rotation owns the active slot
+                if (challenge.ValidTo >= DateTime.UtcNow)
+                {
+                    challenge.ValidFrom = validFrom;
+                    challenge.ValidTo = validFrom.AddDays(spec.ValidForDays);
+                }
                 challenges.Add(challenge);
                 continue;
             }

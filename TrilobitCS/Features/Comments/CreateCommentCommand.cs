@@ -25,6 +25,10 @@ public class CreateCommentHandler : IRequestHandler<CreateCommentCommand, Commen
         if (!await PolymorphicTargetHelper.CommentableTargetExistsAsync(_db, command.Type, command.TargetId, cancellationToken))
             throw new NotFoundException("errors.commentable_target_not_found");
 
+        var rootPostId = await PrivacyGuard.ResolveRootPostIdAsync(_db, command.Type, command.TargetId, cancellationToken);
+        if (rootPostId is null || !await PrivacyGuard.IsPostVisibleAsync(_db, command.UserId, rootPostId.Value, cancellationToken))
+            throw new NotFoundException("errors.commentable_target_not_found");
+
         var comment = new Comment
         {
             UserId = command.UserId,

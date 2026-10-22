@@ -30,7 +30,7 @@ Světlo (1–4)
 
 Každé pero má dvě varianty obtížnosti: **čin** (`challenge`) a **velký čin** (`grand_challenge`).
 
-**Workflow získání pera (user_eagle_feathers) — zatím bez API:**
+**Workflow získání pera (user_eagle_feathers) — API implementováno (viz „User Eagle Feathers"):**
 1. Dítě označí pero jako splněné a přiloží fotky → vytvoří se `user_eagle_feathers` se `status = Pending` a po schválení i příspěvek s `user_eagle_feather_id`
 2. Vedoucí organizace uvidí příspěvek ke schválení
 3. Vedoucí schválí (`status = Approved`, `verified_by = leader_id`, `earned_at = now()`) → příspěvek dostane vizuální potvrzení (fajfka), pero se počítá do leaderboardu
@@ -65,16 +65,16 @@ Přístup je **leader-driven**: leader pošle pozvánku konkrétnímu uživateli
 **Status enum `OrganisationInviteStatus`:** `0 = Pending`, `1 = Accepted`, `2 = Declined`
 
 **Podzáložky organizace:**
-1. **Feed** — příspěvky členů organizace (obdoba homepage, ale filtrované na danou organizaci) — **zatím bez API**
-2. **Leaderboard** — žebříček aktivit v rámci týmu, pouze schválená pera — **zatím bez API**
+1. **Feed** — příspěvky publikované do organizace (`GET /api/organisations/{id}/feed`), filtrované privacy pravidlem
+2. **Leaderboard** — žebříček aktivit v rámci týmu, pouze schválená pera (`GET /api/organisations/{id}/leaderboard`)
 3. **Memberlist** — seznam členů organizace (`GET /api/organisations/{id}/members`)
 
 ### 4. Profil uživatele
 
-- Příspěvky uživatele — **zatím bez API**
-- Seznam získaných orlích per a statistiky — **zatím bez API**
-- Profil může být **soukromý** — obsah vidí jen followers — **zatím bez `is_private` pole**
-- Sledování je **jednostranné** (jako Instagram — bez schválení druhé strany) — **zatím bez API**
+- Příspěvky uživatele (`GET /api/users/{id}/posts`)
+- Seznam získaných orlích per a statistiky (`GET /api/users/{id}/eagle-feathers`, `GET /api/users/{id}/stats`)
+- Profil může být **soukromý** (`is_private`) — obsah vidí jen followers a sám uživatel (viz „Privacy model")
+- Sledování je **jednostranné** (jako Instagram — bez schválení druhé strany) — `POST|DELETE /api/users/{id}/follow`
 
 ---
 
@@ -148,47 +148,80 @@ Migrace se spouštějí **automaticky při startu aplikace** (`db.Database.Migra
 TrilobitCS/
 ├── Auth/
 │   ├── BcryptPasswordHasher.cs          # Hash::make() / Hash::check()
+│   ├── JwtSigningKey.cs                 # Signing key pro JWT
 │   └── JwtTokenService.cs               # GenerateAccessToken() + GenerateRefreshToken()
 ├── Console/
 │   └── ScrapeEagleFeathersCommand.cs    # dotnet run -- scrape
 ├── Controllers/
+│   ├── AnnouncementsController.cs       # POST|GET /api/organisations/{id}/announcements, PUT|DELETE /api/announcements/{id}
 │   ├── AuthController.cs                # POST /api/auth/{register,login,refresh,logout}
-│   ├── EagleFeathersController.cs       # GET /api/eagle-feathers[/{id}]  [Authorize]
+│   ├── ChallengesController.cs          # GET /api/challenges/current, GET /api/challenges/{id}, POST /api/challenges/{id}/{pin,unpin}
+│   ├── CommentsController.cs            # POST|GET /api/posts/{id}/comments, POST|GET /api/comments/{id}/comments, PUT|DELETE /api/comments/{id}
+│   ├── EagleFeathersController.cs       # GET /api/eagle-feathers[/{id}], GET /api/eagle-feathers/lights[/{light}/sections[/{section}]]  [Authorize]
+│   ├── FeedController.cs                # GET /api/feed
+│   ├── FollowersController.cs           # POST|DELETE /api/users/{id}/follow, GET /api/users/{id}/{followers,following}
+│   ├── LikesController.cs               # POST|DELETE /api/posts/{id}/likes, POST|DELETE /api/comments/{id}/likes
 │   ├── OrganisationInvitesController.cs # POST|GET /api/organisation-invites, POST /api/organisation-invites/{id}/{accept,decline}
-│   ├── OrganisationsController.cs       # POST|GET /api/organisations[/{id}], PUT /api/organisations/{id}, GET /api/organisations/{id}/members
-│   └── UsersController.cs               # GET /api/users/{id}, GET|PUT|DELETE /api/user, DELETE /api/user/organisation
+│   ├── OrganisationsController.cs       # POST|GET /api/organisations[/{id}], PUT /api/organisations/{id}, GET /api/organisations/{id}/{members,leaderboard,feed}
+│   ├── PostsController.cs               # GET|PUT|DELETE /api/posts/{id}, POST /api/user-eagle-feathers/{uefId}/posts
+│   ├── UserEagleFeathersController.cs   # /api/user-eagle-feathers[/{id}[/retry|/approve|/reject]], /api/user-eagle-feathers/pending
+│   └── UsersController.cs               # GET /api/users/{id}[/posts|/eagle-feathers|/stats], GET|PUT|DELETE /api/user, DELETE /api/user/organisation
 ├── Data/
 │   └── AppDbContext.cs                  # EF Core DbContext — používá se přímo v handlerech
 ├── Exceptions/                          # NotFoundException, ConflictException, UnauthorizedException, ForbiddenException
 ├── Extensions/
 │   └── ClaimsPrincipalExtensions.cs     # GetUserId() — čte sub claim z JWT
 ├── Features/                            # CQRS handlery (MediatR)
+│   ├── Announcements/                   # CreateAnnouncementCommand, GetAnnouncementsQuery, UpdateAnnouncementCommand, DeleteAnnouncementCommand
 │   ├── Auth/                            # RegisterCommand, LoginCommand, LogoutCommand, RefreshCommand
-│   ├── EagleFeathers/                   # UpdateOrCreateEagleFeatherCommand
+│   ├── Challenges/                      # GetCurrentChallengeQuery, GetChallengeQuery, PinChallengeCommand, UnpinChallengeCommand, GenerateWeeklyChallengeCommand, ChallengeProjections
+│   ├── Comments/                        # CreateCommentCommand, GetCommentsQuery, UpdateCommentCommand, DeleteCommentCommand
+│   ├── EagleFeathers/                   # UpdateOrCreateEagleFeather.cs (UpdateOrCreateEagleFeatherCommand), GetEagleFeather*Query
+│   ├── Feed/                            # GetPersonalFeedQuery
+│   ├── Followers/                       # FollowUserCommand, UnfollowUserCommand, GetFollowersQuery, GetFollowingQuery
+│   ├── Likes/                           # LikeTargetCommand, UnlikeTargetCommand
 │   ├── OrganisationInvites/             # SendOrganisationInviteCommand, GetOrganisationInvitesQuery, AcceptOrganisationInviteCommand, DeclineOrganisationInviteCommand
-│   ├── Organisations/                   # CreateOrganisationCommand, GetOrganisationQuery, UpdateOrganisationCommand, GetOrganisationMembersQuery
-│   └── Users/                           # GetUserQuery, GetCurrentUserQuery, UpdateUserCommand, DeleteUserCommand, LeaveOrganisationCommand
+│   ├── Organisations/                   # CreateOrganisationCommand, GetOrganisationQuery, UpdateOrganisationCommand, GetOrganisationMembersQuery, GetOrganisationLeaderboardQuery, GetOrganisationFeedQuery
+│   ├── Posts/                           # CreatePostCommand, GetPostQuery, UpdatePostCommand, DeletePostCommand
+│   ├── Shared/                          # PrivacyGuard (privacy pravidlo), PolymorphicTargetHelper, CommentCascadeHelper
+│   ├── UserEagleFeathers/               # CreateUserEagleFeatherCommand, DeleteUserEagleFeatherCommand, RetryUserEagleFeatherCommand, GetMyUserEagleFeathersQuery, GetPendingUserEagleFeathersQuery, Approve/RejectUserEagleFeatherCommand
+│   └── Users/                           # GetUserQuery, GetUserPostsQuery, GetUserEagleFeathersQuery, GetUserStatsQuery, GetCurrentUserQuery, UpdateUserCommand, DeleteUserCommand, LeaveOrganisationCommand
 ├── Middleware/
 │   └── ExceptionHandlerMiddleware.cs
 ├── Migrations/
-├── Models/                              # EF Core entity (User, Organisation, OrganisationInvite, EagleFeather, RefreshToken, Gender, UserRole, OrganisationInviteStatus, ...)
+├── Models/                              # EF Core entity (User, Organisation, OrganisationInvite, EagleFeather, RefreshToken, Post, Like, Comment, Follower, Challenge, UserChallenge, UserEagleFeather, Announcement, Gender, UserRole, OrganisationInviteStatus, EagleFeatherStatus, LikeableType, CommentableType)
 ├── OpenApi/
-│   └── BearerSecuritySchemeTransformer.cs  # Přidá JWT Bearer do OpenAPI schématu
-├── Requests/                            # RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest, CreateOrganisationRequest, UpdateOrganisationRequest, SendOrganisationInviteRequest
-├── Responses/                           # AuthResponse, EagleFeatherResponse, PublicUserResponse, SelfUserResponse, OrganisationResponse, OrganisationMemberResponse, OrganisationInviteResponse
+│   ├── BearerSecuritySchemeTransformer.cs  # Přidá JWT Bearer do OpenAPI schématu
+│   └── EnumSchemaTransformer.cs
+├── Pagination/                          # PaginationQuery (page, pageSize; max 100), PagedResponse<T>, PaginationExtensions
+├── Queries/                             # IQueryOptions.cs (podsložky jsou prázdné)
+├── Requests/                            # Request DTO (RegisterRequest, LoginRequest, RefreshRequest, UpdateUserRequest, CreatePostRequest, CreateCommentRequest, CreateUserEagleFeatherRequest, ModerateUserEagleFeatherRequest, CreateAnnouncementRequest, ...)
+├── Responses/                           # AuthResponse, UserMeResponse, UserProfileResponse, PublicUserResponse, UserStatsResponse, OrganisationResponse, OrganisationMemberResponse, OrganisationInviteResponse, LeaderboardEntryResponse, PostResponse, CommentResponse, LikeResponse, FollowResponse, ChallengeResponse, CurrentChallengeResponse, EagleFeatherResponse, UserEagleFeatherResponse, AnnouncementResponse
 ├── Services/
+│   ├── DemoDataSeeder.cs                # Demo data (jen při DemoSeeding:Enabled, ne v Testing)
+│   ├── DemoDataSeederService.cs         # BackgroundService — spouští seeder každých 24 hodin
 │   ├── RefreshTokenCleanupService.cs    # BackgroundService — denně maže expired/revoked refresh tokeny
-│   └── SvitekScraper.cs                 # Scraper woodcraft.cz (Windows-1250 encoding)
-└── Validators/                          # RegisterRequestValidator, LoginRequestValidator, UpdateUserRequestValidator, CreateOrganisationRequestValidator, UpdateOrganisationRequestValidator, SendOrganisationInviteValidator
+│   ├── SvitekScraper.cs                 # Scraper woodcraft.cz (Windows-1250 encoding)
+│   └── WeeklyChallengeRotationService.cs # BackgroundService — hodinový tick, generuje týdenní výzvu
+└── Validators/                          # Jeden validator na request (`<Request>Validator.cs`), Shared/ pro sdílená pravidla (UserFieldRules.cs)
 
 TrilobitCS.Tests/
 ├── ApiCollection.cs                     # Sdílí 1 PostgreSQL kontejner napříč testy [Collection("Api")]
+├── ApiTestBase.cs
 ├── TrilobitWebApplicationFactory.cs
+├── Announcements/                       # AnnouncementsApiTests
 ├── Auth/                                # RegisterApiTests, LoginApiTests, LogoutApiTests, RefreshApiTests
+├── Comments/                            # CommentsApiTests
+├── EagleFeathers/                       # EagleFeathersApiTests, SvitekScraperTests, Fixtures/
+├── Feed/                                # FeedApiTests
+├── Followers/                           # FollowersApiTests
+├── Likes/                               # LikesApiTests
 ├── OrganisationInvites/                 # OrganisationInvitesApiTests
-├── Organisations/                       # OrganisationApiTests
+├── Organisations/                       # OrganisationApiTests, OrganisationFeedApiTests
+├── Privacy/                             # PrivacyEnforcementApiTests — tabulka gated endpointů (viz „Privacy model")
+├── UserEagleFeathers/                   # UserEagleFeathersApiTests
 ├── Users/                               # UsersApiTests (GET, GET me, PUT, DELETE, Leave Organisation)
-└── Factories/                           # RegisterRequestFactory, UpdateUserRequestFactory, CreateOrganisationRequestFactory
+└── Factories/                           # Bogus generátory request DTO (<Model>RequestFactory.cs)
 ```
 
 ---
@@ -251,12 +284,13 @@ Response body: `{ "message": "..." }` — zpráva je i18n klíč (např. `"error
   await _db.SaveChangesAsync(ct);
   ```
 
-Integrační testy přes Testcontainers běží nad reálnou PostgreSQL, takže repozitáře nejsou potřeba ani pro mockování. Vzor: `Features/EagleFeathers/UpdateOrCreateEagleFeatherCommand.cs`.
+Integrační testy přes Testcontainers běží nad reálnou PostgreSQL, takže repozitáře nejsou potřeba ani pro mockování. Vzor: `Features/EagleFeathers/UpdateOrCreateEagleFeather.cs` (handler `UpdateOrCreateEagleFeatherHandler`).
 
-### Response objekty — Privacy model
+### Response objekty — profily
 
-- `PublicUserResponse` — veřejný profil (bez emailu), vrací `GET /api/users/{id}`
-- `SelfUserResponse` — vlastní profil (s emailem, `role`, `organisationId`), vrací `GET /api/user/me`
+- `PublicUserResponse` — štíhlý tvar pro listy uživatelů (bez emailu), vrací `GET /api/users/{id}/followers|following`
+- `UserProfileResponse` — profil cizího/veřejného uživatele, vrací `GET /api/users/{id}`; počty jsou `null`, pokud je profil privátní a viewer ho nesleduje (viz „Privacy model")
+- `UserMeResponse` — vlastní profil (s emailem, `role`, `organisationId`, `isPrivate` a počty), vrací `GET /api/user/me` a `PUT /api/user`
 - Ostatní response typy jsou v `Responses/`
 
 ### Testy
@@ -292,9 +326,50 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
 - **Retry spam:** `POST /retry` bez rate limitu / retry_count / rejected_at. Later: pokud v praxi spam, přidat sloupec `retry_count` + limit.
 - **Grand challenge upgrade:** `is_grand_challenge` je immutable. Známé limitation: dítě se schváleným činem, které chce jít na velký čin téhož pera, musí DELETE + POST nový (ztratí historii Approved). Produktové rozhodnutí: paralelní čin + velký čin na jednom peru? Řešení: změnit UNIQUE na `(user_id, eagle_feather_id, is_grand_challenge)` + rozhodnout leaderboard logiku.
 
+### Privacy model
+
+Viditelnost obsahu uživatele je definovaná na jednom místě: `Features/Shared/PrivacyGuard.cs` (statická třída). Handlery ji volají explicitně — žádný EF global query filter, žádná RLS.
+
+Pravidlo (V = viewer, T = cílový uživatel, P = post, A = autor postu):
+
+```
+CanViewProfile(V, T) = V.Id == T.Id || !T.IsPrivate || V sleduje T
+CanViewPost(V, P)    = CanViewProfile(V, A)
+                       || (P.OrganisationId != null && P.OrganisationId == V.OrganisationId)
+```
+
+- `ProfileVisibleTo(viewerId)` a `PostVisibleTo(viewerId, viewerOrgId)` jsou `Expression<Func<…, bool>>` predikáty pro použití přímo v EF dotazech (`Where`). `PostVisibleTo` je psaný explicitně, ne skládaný, aby ho EF převedl do SQL.
+- `EnsureProfileVisibleAsync` hodí 403 pro skrytý profil. `IsPostVisibleAsync` vrací `bool`, u komentářů a lajků se nejprve přes `ResolveRootPostIdAsync` (walk-up reply chain až na root post) najde post.
+- Viewer org se načítá jednou per request (`GetViewerOrganisationIdAsync`).
+
+**Gate tabulka:**
+
+| Gate | Odpověď při zamítnutí | Endpointy |
+|---|---|---|
+| **Profile gate** | 403 `errors.user_is_private` | `GET /api/users/{id}/posts`, `/eagle-feathers`, `/stats`, `GET /api/users/{id}/followers`, `/following` |
+| **Post gate (single)** | 404 — **stejný klíč jako pro neexistující cíl na dané cestě**, takže skrytý a neexistující post nelze rozlišit | `GET /api/posts/{id}` → `errors.post_not_found`; `GET|POST /api/posts/{id}/comments`, `GET|POST /api/comments/{id}/comments` → `errors.commentable_target_not_found`; `POST /api/posts/{id}/likes`, `POST /api/comments/{id}/likes` → `errors.likeable_target_not_found` |
+| **Post gate (list filter)** | položka se vynechá, stránka se nerozbije | `GET /api/organisations/{id}/feed` |
+| **Profile shape** | 200, počty `null` | `GET /api/users/{id}` (`UserProfileResponse`) |
+
+Záměrné výjimky:
+- **Unlike** (`DELETE /api/posts/{id}/likes`, `DELETE /api/comments/{id}/likes`) nemá gate. Vrací vždy 204 a neprozrazuje obsah.
+- **Úprava a mazání obsahu** (`PUT|DELETE /api/posts/{id}`, `PUT|DELETE /api/comments/{id}`): autor projde vždy. Ne-autor dostane u skrytého postu/komentáře 404 (`errors.post_not_found` / `errors.comment_not_found`, stejně jako u neexistujícího id), ne 403. 403 `errors.forbidden` dostane jen ne-autor viditelného obsahu.
+- **Org-mate, který nesleduje privátního uživatele:** jeho profilové listy dostane 403, ale jeho posty v org feedu, `GET /api/posts/{id}` a komentáře/lajky vidí (přes `organisationId`).
+- **Členství v organizaci:** `GET /api/organisations/{id}/members` a `GET /api/organisations/{id}/leaderboard` ověřují jen existenci organizace, ne členství. Každý přihlášený uživatel vidí členy a leaderboard libovolné organizace. Jde o záměrnou výjimku z privacy pravidla: členové i privátní se zobrazují včetně `approvedFeatherCount`.
+- **Členství v organizaci (announcements):** `GET /api/organisations/{id}/announcements` vyžaduje členství (`user.organisationId == id`).
+- **Self-only nebo role-only:** `GET /api/user/eagle-feathers`, `GET /api/organisation-invites` (self), `GET /api/user-eagle-feathers/pending` (Leader moderace vidí vše), `GET /api/feed` (jen self + followed).
+- **Publikace do organizace:** `CreatePost` s `organisationId` povolí jen autorovi, který je členem té organizace. Jinak 403 `errors.not_organisation_member`. Tím se nedá publikovat do cizí org a obejít privacy pravidlo.
+
+**Konvence pro nové endpointy:**
+- Každý nový endpoint, který vrací obsah uživatele (profil, posty, komentáře, lajky, pera, statistiky, seznamy), musí volat `PrivacyGuard` (`EnsureProfileVisibleAsync`, `IsPostVisibleAsync` nebo `PostVisibleTo`).
+- Pro cíl, který je post nebo komentář, použij 404 se stejným klíčem jako pro neexistující cíl na dané cestě.
+- Každý takový endpoint přidej jako řádek do `TrilobitCS.Tests/Privacy/PrivacyEnforcementApiTests.cs` (tabulka gated endpointů × role viewera).
+
 ---
 
 ## Existující API endpointy
+
+Stránkované endpointy přijímají `?page=1&pageSize=20` (`pageSize` max 100). Neplatné hodnoty → 422. Odpověď `PagedResponse<T>` má tvar `{ "items": [...], "page": 1, "pageSize": 20, "totalCount": 0, "totalPages": 0 }`.
 
 ### Auth (`/api/auth`)
 
@@ -333,20 +408,76 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
 
 | Method | Path | Auth | Response | Popis |
 |---|---|---|---|---|
-| GET | `/api/eagle-feathers` | **ano** | `EagleFeatherResponse[]` (200) | Všechna pera |
+| GET | `/api/eagle-feathers` | **ano** | `PagedResponse<EagleFeatherResponse>` (200) | Všechna pera (stránkované) |
 | GET | `/api/eagle-feathers/{id}` | **ano** | `EagleFeatherResponse` (200) | Jedno pero |
+| GET | `/api/eagle-feathers/lights` | **ano** | `int[]` (200) | Seznam světel |
+| GET | `/api/eagle-feathers/lights/{light}/sections` | **ano** | `string[]` (200) | Sekce daného světla (např. `1A`, `1B`) |
+| GET | `/api/eagle-feathers/lights/{light}/sections/{section}` | **ano** | `EagleFeatherResponse[]` (200) | Pera v sekci |
 
 ### Users (`/api/users`, `/api/user`)
 
 | Method | Path | Auth | Request body | Response | Popis |
 |---|---|---|---|---|---|
-| GET | `/api/users/{id}` | ano | — | `PublicUserResponse` (200) | Veřejný profil uživatele (bez emailu) |
-| GET | `/api/user/me` | ano | — | `SelfUserResponse` (200) | Vlastní profil (s emailem, role, organisationId) |
-| PUT | `/api/user` | ano | `UpdateUserRequest` | `SelfUserResponse` (200) | Aktualizace vlastního profilu |
+| GET | `/api/users/{id}` | ano | — | `UserProfileResponse` (200) | Profil uživatele (bez emailu). Pro privátní profil, který viewer nesleduje, jsou počty `null` (`isPrivate: true`, `isFollowing: false`) |
+| GET | `/api/user/me` | ano | — | `UserMeResponse` (200) | Vlastní profil (s emailem, role, organisationId, isPrivate a počty) |
+| PUT | `/api/user` | ano | `UpdateUserRequest` | `UserMeResponse` (200) | Aktualizace vlastního profilu. Pole `nickname`, `firstName`, `lastName`, `gender`, `birthDate`, `profilePicture` se posílají celá; `isPrivate` je volitelné (když chybí, nemění se) |
 | DELETE | `/api/user` | ano | — | 204 No Content | Smazání vlastního účtu (včetně refresh tokenů) |
 | DELETE | `/api/user/organisation` | ano | — | 204 No Content | Odchod z organizace (Leader vlastní org blokován) |
 
-**PublicUserResponse:**
+**UpdateUserRequest:**
+```json
+{
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "gender": 0,
+  "birthDate": "2000-01-01",
+  "profilePicture": null,
+  "isPrivate": true
+}
+```
+
+**UserProfileResponse:**
+```json
+{
+  "id": 1,
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "profilePicture": null,
+  "createdAt": "2026-04-25T...",
+  "isPrivate": false,
+  "isFollowing": true,
+  "followerCount": 12,
+  "followingCount": 8,
+  "approvedFeatherCount": 3,
+  "postCount": 5
+}
+```
+
+**UserMeResponse:**
+```json
+{
+  "id": 1,
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "email": "jan@example.com",
+  "gender": 0,
+  "birthDate": "2000-01-01",
+  "profilePicture": null,
+  "role": 0,
+  "organisationId": null,
+  "createdAt": "2026-04-25T...",
+  "isPrivate": false,
+  "followerCount": 12,
+  "followingCount": 8,
+  "approvedFeatherCount": 3,
+  "postCount": 5
+}
+```
+
+**PublicUserResponse** (položky listů followers/following):
 ```json
 {
   "id": 1,
@@ -358,20 +489,21 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
 }
 ```
 
-**SelfUserResponse:**
+### User profile aggregates (`/api/users/{id}/posts|eagle-feathers|stats`)
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| GET | `/api/users/{id}/posts` | ano | — | `PagedResponse<PostResponse>` (200) | Posty uživatele, řazeno `createdAt DESC`. 403 `errors.user_is_private` pro cizí privátní profil bez followingu, 404 `errors.user_not_found` |
+| GET | `/api/users/{id}/eagle-feathers` | ano | — | `PagedResponse<UserEagleFeatherResponse>` (200) | Pera uživatele. Vlastní profil vidí všechny statusy, ostatní jen `Approved`. Stejné 403/404 jako výše |
+| GET | `/api/users/{id}/stats` | ano | — | `UserStatsResponse` (200) | Počty: posty, schválená pera, followers, following. Stejné 403/404 jako výše |
+
+**UserStatsResponse:**
 ```json
 {
-  "id": 1,
-  "nickname": "jan99",
-  "firstName": "Jan",
-  "lastName": "Novák",
-  "email": "jan@example.com",
-  "gender": "Male",
-  "birthDate": "2000-01-01",
-  "profilePicture": null,
-  "role": "User",
-  "organisationId": null,
-  "createdAt": "2026-04-25T..."
+  "postCount": 5,
+  "approvedFeatherCount": 3,
+  "followerCount": 12,
+  "followingCount": 8
 }
 ```
 
@@ -382,7 +514,7 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
 | POST | `/api/organisations` | Leader | `CreateOrganisationRequest` | `OrganisationResponse` (200) | Vytvoří org, leader_id = current user |
 | GET | `/api/organisations/{id}` | ano | — | `OrganisationResponse` (200) | Detail organizace s počtem členů |
 | PUT | `/api/organisations/{id}` | Leader dané org | `UpdateOrganisationRequest` | `OrganisationResponse` (200) | Aktualizace org (jen vlastní org) |
-| GET | `/api/organisations/{id}/members` | ano | — | `OrganisationMemberResponse[]` (200) | Seznam členů organizace |
+| GET | `/api/organisations/{id}/members` | ano | — | `PagedResponse<OrganisationMemberResponse>` (200) | Seznam členů organizace (bez kontroly členství volajícího). `isFollowing` = volající sleduje člena. 404 `errors.organisation_not_found` |
 
 **CreateOrganisationRequest:**
 ```json
@@ -414,6 +546,39 @@ Nahrazuje Swashbuckle (byl nutný regex hack na 3.0.4 → 3.0.1). Scalar UI na `
   "createdAt": "2026-04-25T..."
 }
 ```
+
+**OrganisationMemberResponse:**
+```json
+{
+  "id": 1,
+  "nickname": "jan99",
+  "firstName": "Jan",
+  "lastName": "Novák",
+  "profilePicture": null,
+  "role": 0,
+  "createdAt": "2026-04-25T...",
+  "isFollowing": true
+}
+```
+
+### Leaderboard (`/api/organisations/{id}/leaderboard`)
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| GET | `/api/organisations/{id}/leaderboard` | ano | — | `PagedResponse<LeaderboardEntryResponse>` (200) | Žebříček členů organizace podle počtu schválených per (`Status == Approved`). Řazení `approvedFeatherCount DESC, userId ASC`, členové s 0 jsou zahrnuti. 404 `errors.organisation_not_found` |
+
+**LeaderboardEntryResponse** (položka `items`):
+```json
+{
+  "rank": 1,
+  "userId": 3,
+  "nickname": "jan99",
+  "profilePicture": null,
+  "approvedFeatherCount": 7
+}
+```
+
+`rank = (page - 1) * pageSize + index + 1`, počítá se až nad stránkou (stejné pořadí napříč stránkami).
 
 ### Organisation Invites (`/api/organisation-invites`)
 
@@ -448,7 +613,7 @@ Status: `0` = Pending, `1` = Accepted, `2` = Declined
 | Method | Path | Auth | Response | Popis |
 |---|---|---|---|---|
 | GET | `/api/feed` | ano | `PagedResponse<PostResponse>` (200) | Osobní feed: moje posty + posty sledovaných uživatelů (bez ohledu na `organisationId`), řazeno `createdAt DESC` |
-| GET | `/api/organisations/{id}/feed` | ano | `PagedResponse<PostResponse>` (200) | Všechny posty publikované do dané organizace (`organisationId == id`), řazeno `createdAt DESC`. Přístupné komukoli přihlášenému, bez kontroly členství (na rozdíl od Announcements) |
+| GET | `/api/organisations/{id}/feed` | ano | `PagedResponse<PostResponse>` (200) | Posty publikované do dané organizace (`organisationId == id`), řazeno `createdAt DESC`. Filtrováno privacy pravidlem (`PrivacyGuard.PostVisibleTo`): posty privátního autora vidí jen jeho followeři, autor a členové téže organizace. Přístupné komukoli přihlášenému, bez kontroly členství organizace (na rozdíl od Announcements). 404 `errors.organisation_not_found` |
 
 Obě vrací stejný `PostResponse` tvar jako `GET /api/posts/{id}` (viz níže).
 
@@ -456,8 +621,8 @@ Obě vrací stejný `PostResponse` tvar jako `GET /api/posts/{id}` (viz níže).
 
 | Method | Path | Auth | Request body | Response | Popis |
 |---|---|---|---|---|---|
-| POST | `/api/user-eagle-feathers/{uefId}/posts` | ano | `CreatePostRequest` | `PostResponse` (200) | Vytvoří post vázaný na user_eagle_feather; nastaví UEF.IsCompleted = true |
-| GET | `/api/posts/{id}` | ano | — | `PostResponse` (200) | Detail příspěvku |
+| POST | `/api/user-eagle-feathers/{uefId}/posts` | ano | `CreatePostRequest` | `PostResponse` (200) | Vytvoří post vázaný na user_eagle_feather; nastaví UEF.IsCompleted = true. Pokud je `organisationId` vyplněné, autor musí být členem té organizace: 403 `errors.not_organisation_member`. 404 `errors.user_eagle_feather_not_found` / `errors.organisation_not_found`, 403 `errors.forbidden` pro cizí UEF |
+| GET | `/api/posts/{id}` | ano | — | `PostResponse` (200) | Detail příspěvku. Skrytý post (privacy gate) vrací 404 `errors.post_not_found`, stejně jako neexistující |
 | PUT | `/api/posts/{id}` | ano (autor) | `UpdatePostRequest` | `PostResponse` (200) | Aktualizace příspěvku |
 | DELETE | `/api/posts/{id}` | ano (autor) | — | 204 No Content | Smazání příspěvku; nastaví UEF.IsCompleted = false |
 
@@ -486,6 +651,114 @@ Obě vrací stejný `PostResponse` tvar jako `GET /api/posts/{id}` (viz níže).
   "createdAt": "2026-05-15T..."
 }
 ```
+
+### Followers (`/api/users/{id}/follow`, `/api/users/{id}/followers`, `/api/users/{id}/following`)
+
+Sledování je jednostranné, bez schválení druhé strany — i na privátní profil lze sledovat okamžitě. Rate limit policy `social` (viz „Rate limiting").
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/users/{id}/follow` | ano | — | `FollowResponse` (200) | Sleduje uživatele (idempotentní — opakované volání vrátí existující vztah). 404 `errors.user_not_found`, 422 `errors.cannot_follow_self` |
+| DELETE | `/api/users/{id}/follow` | ano | — | 204 No Content | Zruší sledování (no-op, pokud nesleduje) |
+| GET | `/api/users/{id}/followers` | ano | — | `PagedResponse<PublicUserResponse>` (200) | Followeři uživatele. Profile gate: 403 `errors.user_is_private`, 404 `errors.user_not_found` |
+| GET | `/api/users/{id}/following` | ano | — | `PagedResponse<PublicUserResponse>` (200) | Uživatelé, které `{id}` sleduje. Stejné 403/404 jako `followers` |
+
+**FollowResponse:**
+```json
+{
+  "followerId": 3,
+  "followingId": 1,
+  "createdAt": "2026-10-14T..."
+}
+```
+
+### Comments (`/api/posts/{id}/comments`, `/api/comments/{id}/comments`, `/api/comments/{id}`)
+
+Komentáře jsou polymorfní: na post (`commentableType = 0`) nebo na jiný komentář (`commentableType = 1`). GET vrací jen přímé potomky. Hidden post a neexistující cíl vrací stejnou 404 odpověď (`errors.commentable_target_not_found`), viz „Privacy model".
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/posts/{id}/comments` | ano | `CreateCommentRequest` | `CommentResponse` (200) | Komentář k postu. Rate limit `social`. 404 `errors.commentable_target_not_found`, 422 validace |
+| GET | `/api/posts/{id}/comments` | ano | — | `PagedResponse<CommentResponse>` (200) | Přímé komentáře k postu. 404 `errors.commentable_target_not_found` |
+| POST | `/api/comments/{id}/comments` | ano | `CreateCommentRequest` | `CommentResponse` (200) | Odpověď na komentář. Rate limit `social`. 404 `errors.commentable_target_not_found` |
+| GET | `/api/comments/{id}/comments` | ano | — | `PagedResponse<CommentResponse>` (200) | Přímé odpovědi na komentář. 404 `errors.commentable_target_not_found` |
+| PUT | `/api/comments/{id}` | autor | `UpdateCommentRequest` | `CommentResponse` (200) | Úprava vlastního komentáře. 403 `errors.forbidden`, 404 `errors.comment_not_found`, 422 validace |
+| DELETE | `/api/comments/{id}` | autor | — | 204 No Content | Smaže komentář a rekurzivně všechny potomky včetně jejich lajků. 403 `errors.forbidden`, 404 `errors.comment_not_found` |
+
+**CreateCommentRequest / UpdateCommentRequest:**
+```json
+{ "content": "string (required)" }
+```
+
+**CommentResponse:**
+```json
+{
+  "id": 1,
+  "author": { "id": 3, "nickname": "jan99", "profilePicture": null },
+  "commentableType": 0,
+  "commentableId": 5,
+  "content": "Super výkon!",
+  "createdAt": "2026-10-14T..."
+}
+```
+
+### Likes (`/api/posts/{id}/likes`, `/api/comments/{id}/likes`)
+
+Lajk je idempotentní (opakované volání vrátí existující lajk), self-like je povolen. Unlike je no-op, pokud lajk neexistuje.
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| POST | `/api/posts/{id}/likes` | ano | — | `LikeResponse` (200) | Lajk postu. 404 `errors.likeable_target_not_found` (i pro skrytý post). Rate limit `social` |
+| DELETE | `/api/posts/{id}/likes` | ano | — | 204 No Content | Odlajkování postu (bez privacy gate). Rate limit `social` |
+| POST | `/api/comments/{id}/likes` | ano | — | `LikeResponse` (200) | Lajk komentáře. 404 `errors.likeable_target_not_found` (i když je root post skrytý). Rate limit `social` |
+| DELETE | `/api/comments/{id}/likes` | ano | — | 204 No Content | Odlajkování komentáře (bez privacy gate). Rate limit `social` |
+
+**LikeResponse:**
+```json
+{
+  "id": 1,
+  "userId": 3,
+  "likeableType": 0,
+  "likeableId": 5,
+  "createdAt": "2026-10-14T..."
+}
+```
+
+### Challenges (`/api/challenges`)
+
+Týdenní výzva je jedna globální `Challenge` (náhodné pero z katalogu jako zadání), generovaná `WeeklyChallengeRotationService` (viz „Cross-cutting infrastruktura"). Uživatel si výzvu může připnout (`pin`) a odepnout (`unpin`). Pin je vázaný na aktivní výzvu.
+
+| Method | Path | Auth | Request body | Response | Popis |
+|---|---|---|---|---|---|
+| GET | `/api/challenges/current` | ano | — | `CurrentChallengeResponse` (200) | Nejnovější aktivní výzva (`ValidFrom <= now < ValidTo`). 404 `errors.challenge_not_found`, pokud žádná není |
+| GET | `/api/challenges/{id}` | ano | — | `ChallengeResponse` (200) | Výzva podle id (i neaktivní). 404 `errors.challenge_not_found` |
+| POST | `/api/challenges/{id}/pin` | ano | — | `CurrentChallengeResponse` (200) | Připne aktivní výzvu. Znovu připnutí dříve odepnuté výzvy je povoleno. 404 `errors.challenge_not_found` (i pro neaktivní), 422 `errors.challenge_already_pinned` |
+| POST | `/api/challenges/{id}/unpin` | ano | — | `CurrentChallengeResponse` (200) | Odepne výzvu. 404 `errors.challenge_not_found`, 422 `errors.challenge_not_pinned` |
+
+**ChallengeResponse:**
+```json
+{
+  "id": 7,
+  "title": "Zimní výzva",
+  "description": "Splň libovolné pero 1. světla venku v mrazu.",
+  "eagleFeatherId": 12,
+  "difficultyLevel": 2,
+  "validFrom": "2026-10-12T00:00:00Z",
+  "validTo": "2026-10-19T00:00:00Z",
+  "createdAt": "2026-10-12T00:00:00Z"
+}
+```
+
+**CurrentChallengeResponse** (odpovědi pin/unpin i current):
+```json
+{
+  "challenge": { "id": 7, "title": "...", "description": "...", "eagleFeatherId": 12, "difficultyLevel": 2, "validFrom": "...", "validTo": "...", "createdAt": "..." },
+  "isPinned": true,
+  "pinnedCount": 4
+}
+```
+
+`pinnedCount` = počet uživatelů, kteří výzvu právě drží připnutou (`UnpinnedAt == null`). `isPinned` je z pohledu volajícího.
 
 ### User Eagle Feathers (`/api/user-eagle-feathers`, `/api/user/eagle-feathers`)
 
@@ -570,6 +843,8 @@ Oznámení organizace. Vytváří/upravuje/maže jen Leader dané organizace, č
 
 ```
 -- IMPLEMENTOVÁNO (API existuje)
+-- Názvy níže jsou logické (snake_case). Skutečné názvy tabulek a sloupců v EF migracích jsou PascalCase
+-- (např. tabulka `Users`, sloupec `IsPrivate`), protože projekt nepoužívá snake_case naming convention.
 users
   id              PK
   nickname        varchar(50)  UNIQUE NOT NULL
@@ -581,6 +856,7 @@ users
   birth_date      date         NOT NULL
   profile_picture varchar(255)
   role            int          DEFAULT 0       -- enum: 0=User, 1=Leader (přiřazuje superadmin v DB)
+  is_private      boolean      NOT NULL DEFAULT false  -- migrace AddUserIsPrivate; true = profil a posty vidí jen followers (+ autor; posty v org feedu navíc členové té org, viz „Privacy model")
   organisation_id int          FK → organisations.id (nullable, SetNull on delete)
   created_at      timestamp    DEFAULT now()
 
@@ -635,8 +911,7 @@ announcements
   updated_at      timestamp (nullable — nastaveno jen při update)
   INDEX(organisation_id)
 
--- MODELY EXISTUJÍ, API ZATÍM NEIMPLEMENTOVÁNO
-followers
+followers  -- API implementováno (follow/unfollow/followers/following)
   id            PK
   follower_id   FK → users.id
   following_id  FK → users.id
@@ -660,14 +935,14 @@ user_eagle_feathers  -- API implementováno (create/list/delete/retry/pending/ap
 posts
   id                    PK
   user_id               FK → users.id
-  organisation_id       FK → organisations.id (nullable — null = jen pro followers)
+  organisation_id       FK → organisations.id (nullable — null = nepublikováno do organizace; viditelnost řeší privacy pravidlo)
   user_eagle_feather_id FK → user_eagle_feathers.id NOT NULL, Cascade on delete — smazání UEF smaže i posty
   challenge_id          FK → challenges.id (nullable — post vznikl přes challenge)
   content               text
   image_url             varchar(255)
   created_at            timestamp
 
-likes
+likes  -- API implementováno (lajky postů a komentářů)
   id             PK
   user_id        FK → users.id
   likeable_type  int          -- enum: 0=Posts, 1=Comments
@@ -676,7 +951,7 @@ likes
   UNIQUE(user_id, likeable_type, likeable_id)
   INDEX(likeable_type, likeable_id)
 
-comments
+comments  -- API implementováno (komentáře a odpovědi)
   id               PK
   user_id          FK → users.id
   commentable_type int          -- enum: 0=Posts, 1=Comments
@@ -685,7 +960,7 @@ comments
   created_at       timestamp
   INDEX(commentable_type, commentable_id)
 
-challenges
+challenges  -- API implementováno (current/detail/pin/unpin); generuje WeeklyChallengeRotationService
   id               PK
   eagle_feather_id FK → eagle_feathers.id NOT NULL (Cascade) — náhodně vybrané pero jako zadání výzvy
   title            varchar(150) NOT NULL
@@ -695,7 +970,7 @@ challenges
   valid_to         timestamp
   created_at       timestamp
 
-user_challenges
+user_challenges  -- API implementováno (pin/unpin)
   id           PK
   user_id      FK → users.id (Cascade)
   challenge_id FK → challenges.id (Cascade)
@@ -712,11 +987,11 @@ user_challenges
 Allowed origins se čtou z `appsettings.json` (`Cors:AllowedOrigins`). Politika povoluje libovolné hlavičky a metody pro nakonfigurované origins. Pro produkci nastavit na skutečnou doménu frontendu.
 
 ### Rate limiting
-.NET 9 built-in `AddRateLimiter`. Fixed window: **5 requestů / 1 minuta na IP** pro:
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
+.NET 9 built-in `AddRateLimiter`. Fixed window, partition podle IP. Dvě policy:
+- **`auth`** — **5 requestů / 1 minuta** na `POST /api/auth/login` a `POST /api/auth/refresh` (`[EnableRateLimiting("auth")]`)
+- **`social`** — **30 requestů / 1 minuta** na write endpointy sociálních interakcí: follow/unfollow (`/api/users/{id}/follow`), lajky (`/api/posts/{id}/likes`, `/api/comments/{id}/likes`, včetně DELETE), vytvoření a úprava/smazání komentáře (`/api/posts/{id}/comments`, `/api/comments/{id}/comments`, `/api/comments/{id}`)
 
-Označení `[EnableRateLimiting("auth")]` na akcích. V testovacím prostředí (`IsEnvironment("Testing")`) je rate limiter vypnutý.
+Rejection status: 429. V testovacím prostředí (`IsEnvironment("Testing")`) je rate limiter vypnutý.
 
 ### Refresh token cleanup
 `Services/RefreshTokenCleanupService.cs` jako `BackgroundService`. Spouští se každých 24 hodin a maže:
@@ -724,6 +999,15 @@ Označení `[EnableRateLimiting("auth")]` na akcích. V testovacím prostředí 
 DELETE FROM refresh_tokens WHERE expires_at < now()
    OR (revoked_at IS NOT NULL AND revoked_at < now() - INTERVAL '30 days')
 ```
+
+### Weekly challenge rotation
+`Services/WeeklyChallengeRotationService.cs` jako `BackgroundService`. Každou hodinu (`PeriodicTimer`) pošle `GenerateWeeklyChallengeCommand(DateTime.UtcNow)` přes MediatR. Výjimky se zalogují a služba běží dál.
+
+- Command běží v transakci s `SELECT pg_advisory_xact_lock(424242)` a trigger vyhodnotí znovu uvnitř zámku, takže více instancí nevytvoří dvě výzvy.
+- **Trigger:** generuje se, pokud neexistuje aktivní výzva (`ValidFrom <= now < ValidTo`), nebo nejnovější aktivní má `ValidFrom <= now - 7 dní`. „Aktivní" a „nejnovější" se počítají vůči předanému `Now`.
+- Výzva: náhodné pero z katalogu (`Title = feather.Name`, `Description = feather.Challenge`, nezkrácené), `DifficultyLevel` 1–3, `ValidFrom = now`, `ValidTo = now + 7 dní`. Prázdný katalog → warning, bez výjimky.
+- Služba se **neregistruje v prostředí `Testing`** (`Program.cs`).
+- `DemoDataSeeder` seeduje jen historické výzvy (`ValidTo < now`), aktivní výzvu tedy vygeneruje až rotace.
 
 ### Structured logging (Serilog)
 `Serilog.AspNetCore` s konfigurací z `appsettings.json`. Request logging middleware zaznamenává každý HTTP request. Výchozí sink: console (JSON formát).

@@ -25,6 +25,12 @@ public class LikeTargetHandler : IRequestHandler<LikeTargetCommand, LikeResponse
         if (!await PolymorphicTargetHelper.LikeableTargetExistsAsync(_db, command.Type, command.TargetId, cancellationToken))
             throw new NotFoundException("errors.likeable_target_not_found");
 
+        var rootPostId = command.Type == LikeableType.Posts
+            ? command.TargetId
+            : await PrivacyGuard.ResolveRootPostIdAsync(_db, CommentableType.Comments, command.TargetId, cancellationToken);
+        if (rootPostId is null || !await PrivacyGuard.IsPostVisibleAsync(_db, command.UserId, rootPostId.Value, cancellationToken))
+            throw new NotFoundException("errors.likeable_target_not_found");
+
         var existing = await _db.Likes.FirstOrDefaultAsync(
             l => l.UserId == command.UserId && l.LikeableType == command.Type && l.LikeableId == command.TargetId,
             cancellationToken);

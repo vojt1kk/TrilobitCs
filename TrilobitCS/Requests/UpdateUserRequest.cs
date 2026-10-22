@@ -8,5 +8,6 @@ public record UpdateUserRequest(
     string LastName,
     Gender Gender,
     DateOnly BirthDate,
-    string? ProfilePicture
+    string? ProfilePicture,
+    bool? IsPrivate = null
 );
