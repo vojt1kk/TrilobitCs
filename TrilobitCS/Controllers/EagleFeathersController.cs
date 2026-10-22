@@ -35,6 +35,20 @@ public class EagleFeathersController : ControllerBase
     public async Task<IActionResult> Index([FromQuery] PaginationQuery pagination, CancellationToken ct)
         => Ok(await _mediator.Send(new GetEagleFeathersQuery(pagination), ct));
 
+    /// <summary>Get the entire eagle feather catalogue in a single response (no pagination)</summary>
+    /// <remarks>
+    /// Catalogue is a bounded static dataset scraped from woodcraft.cz (hundreds of entries).
+    /// Ordered by light, section, number.
+    /// </remarks>
+    /// <response code="200">Returns all eagle feathers</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("all")]
+    [EndpointName("getAllEagleFeathers")]
+    [ProducesResponseType(typeof(EagleFeatherResponse[]), 200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> All(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetAllEagleFeathersQuery(), ct));
+
     /// <summary>Get a single eagle feather by ID</summary>
     /// <param name="id">Eagle feather ID</param>
     /// <param name="ct">Cancellation token</param>

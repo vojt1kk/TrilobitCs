@@ -197,6 +197,51 @@ public class EagleFeathersApiTests : ApiTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // =====================
+    // GET /api/eagle-feathers/all
+    // =====================
+
+    [Fact]
+    public async Task GetAllEagleFeathers_Authenticated_ReturnsFlatArray()
+    {
+        await SeedEagleFeather();
+        await SeedEagleFeather(section: "2A", number: 1);
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers/all");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+        body.GetArrayLength().Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task GetAllEagleFeathers_IgnoresPaginationLimit_ReturnsMoreThan100()
+    {
+        for (var i = 0; i < 101; i++)
+        {
+            await SeedEagleFeather();
+        }
+        var accessToken = await RegisterAndGetToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/eagle-feathers/all");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetArrayLength().Should().BeGreaterThan(100);
+    }
+
+    [Fact]
+    public async Task GetAllEagleFeathers_Unauthenticated_Returns401()
+    {
+        var response = await _client.GetAsync("/api/eagle-feathers/all");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     private static int _featherSeed = 0;
 
     private async Task<int> SeedEagleFeather(string? section = null, short number = 0)
